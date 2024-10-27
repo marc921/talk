@@ -27,7 +27,7 @@ func main() {
 	}
 
 	openapiClient, err := openapi.NewClientWithResponses(
-		"http://localhost:8080",
+		"https://marcbrun.eu",
 	)
 	if err != nil {
 		logger.Fatal("NewClientWithResponses", zap.Error(err))

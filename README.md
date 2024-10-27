@@ -4,5 +4,6 @@ Talk is a simple messaging / data transfer service between clients, linked by a 
 
 ## TODO
 - use symmetric encryption for messages, only use RSA to generate the symmetric key
-- deploy on marcbrun.eu
-- use TLS / HTTPS
+- unit tests
+- CI: unit tests
+- CI: automatic deploy on marcbrun.eu

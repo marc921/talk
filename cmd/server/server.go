@@ -11,6 +11,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"go.uber.org/zap"
+	"golang.org/x/crypto/acme/autocert"
 
 	"github.com/marc921/talk/internal/server"
 )
@@ -52,8 +53,8 @@ func main() {
 	// Echo instance
 	e := echo.New()
 
-	// e.AutoTLSManager.HostPolicy = autocert.HostWhitelist("marcbrun.eu")
-	// e.AutoTLSManager.Cache = autocert.DirCache("/var/www/.cache")
+	e.AutoTLSManager.HostPolicy = autocert.HostWhitelist("marcbrun.eu")
+	e.AutoTLSManager.Cache = autocert.DirCache("/var/www/.cache")
 	e.Use(middleware.Logger())
 
 	go func() {
@@ -81,7 +82,7 @@ func main() {
 	messages.GET("/:username", api.GetMessages)
 
 	// Start server
-	e.Logger.Fatal(e.Start(":8080"))
+	e.Logger.Fatal(e.StartAutoTLS(":443"))
 }
 
 func OnSignal(f func(), logger *zap.Logger) {
