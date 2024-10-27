@@ -1,0 +1,250 @@
+openapi: 3.1.0
+info:
+  title: Talk API
+  description: API for the Talk messaging service
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+paths:
+  /users:
+    post:
+      description: Creates a new user with the provided information.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublicUser'
+      responses:
+        '200':
+          description: PublicUser already exists with the same name and public key
+          # The response body is empty
+        '201':
+          description: PublicUser created successfully
+          # The response body is empty
+        '409':
+          description: PublicUser already exists with the same name but with a different public key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /users/{username}:
+    get:
+      description: Returns a user by username.
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/Username'
+          description: The name of the user to retrieve
+      responses:
+        '200':
+          description: A user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicUser'
+        '404':
+          description: PublicUser not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/{username}:
+    get:
+      description: Returns an auth challenge for the user.
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/Username'
+          description: The name of the user to retrieve the challenge for
+      responses:
+        '200':
+          description: An auth challenge that the user must sign and return
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthChallenge'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      description: Authenticates the user with the signed challenge.
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/Username'
+          description: The name of the user to authenticate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthChallengeSigned'
+      responses:
+        '200':
+          description: User authenticated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JWT'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      
+  /messages/{username}:
+    get:
+      security:
+        - bearerAuth: []
+      description: Returns all messages in the user inbox.
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/Username'
+          description: The name of the user to retrieve messages for
+      responses:
+        '200':
+          description: A list of messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Message'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: PublicUser not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      security:
+        - bearerAuth: []
+      description: Sends a message from one user to another.
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/Username'
+          description: The name of the user to retrieve messages for
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Message'
+      responses:
+        '201':
+          description: Message sent successfully
+          # The response body is empty
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: PublicUser not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth: # arbitrary name for the security scheme
+      type: http
+      scheme: bearer
+      bearerFormat: JWT # optional, arbitrary value for documentation purposes
+  schemas:
+    Username:
+      type: string
+      pattern: '^[a-zA-Z0-9_]+$'
+      minLength: 3
+      maxLength: 20
+    CipherText:
+      type: string
+      format: byte
+    PublicUser:
+      type: object
+      properties:
+        name:
+          $ref: '#/components/schemas/Username'
+        public_key:
+          type: string
+          format: byte
+          description: The public key of the user, PEM encoded
+      required:
+        - name
+        - public_key
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+      required:
+        - error
+    AuthChallenge:
+      type: object
+      properties:
+        token:
+          type: string
+        nonce:
+          type: string
+      required:
+        - token
+        - nonce
+    AuthChallengeSigned:
+      type: object
+      properties:
+        token:
+          type: string
+        signed_nonce:
+          type: string
+      required:
+        - token
+        - signed_nonce
+    JWT:
+      type: object
+      properties:
+        token:
+          type: string
+      required:
+        - token
+    Message:
+      type: object
+      properties:
+        sender:
+          $ref: '#/components/schemas/Username'
+        recipient:
+          $ref: '#/components/schemas/Username'
+        ciphertext:
+          $ref: '#/components/schemas/CipherText'
+      required:
+        - sender
+        - recipient
+        - ciphertext
