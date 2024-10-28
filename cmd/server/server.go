@@ -70,13 +70,14 @@ func main() {
 	}()
 
 	// Routes
-	e.GET("/auth/:username", api.GetAuth)
-	e.POST("/auth/:username", api.PostAuth)
+	v1 := e.Group("/api/v1")
+	v1.GET("/auth/:username", api.GetAuth)
+	v1.POST("/auth/:username", api.PostAuth)
 
-	e.GET("/users/:username", api.GetUser)
-	e.POST("/users", api.AddUser)
+	v1.GET("/users/:username", api.GetUser)
+	v1.POST("/users", api.AddUser)
 
-	messages := e.Group("/messages")
+	messages := v1.Group("/messages")
 	messages.Use(echojwt.JWT([]byte(config.AuthTokenSecretKey)))
 	messages.POST("/:username", api.AddMessage)
 	messages.GET("/:username", api.GetMessages)

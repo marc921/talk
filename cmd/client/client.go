@@ -13,8 +13,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/marc921/talk/internal/client"
-	"github.com/marc921/talk/internal/types"
-	"github.com/marc921/talk/internal/types/openapi"
 )
 
 func main() {
@@ -26,66 +24,23 @@ func main() {
 		zap.L().Fatal("zap.NewDevelopment", zap.Error(err))
 	}
 
-	openapiClient, err := openapi.NewClientWithResponses(
-		"https://marcbrun.eu",
-	)
+	config, err := LoadConfig(ctx)
 	if err != nil {
-		logger.Fatal("NewClientWithResponses", zap.Error(err))
+		if errors.Is(err, ErrAbortedByUser) {
+			return
+		}
+		logger.Fatal("LoadConfig", zap.Error(err))
 	}
 
-	alicePrivKey, err := loadPrivateKey("alice")
+	ui, err := client.NewUI(config.Server.URL)
 	if err != nil {
-		logger.Fatal("loadPrivateKey", zap.Error(err))
+		logger.Fatal("NewUI", zap.Error(err))
 	}
+	defer ui.Close()
 
-	alice, err := client.NewUser(
-		openapi.Username("alice"),
-		alicePrivKey,
-		client.NewClient(openapiClient, openapi.Username("alice")),
-	)
+	err = ui.Run(ctx)
 	if err != nil {
-		logger.Fatal("NewUser", zap.Error(err))
-	}
-
-	bobPrivKey, err := loadPrivateKey("bob")
-	if err != nil {
-		logger.Fatal("loadPrivateKey", zap.Error(err))
-	}
-
-	bob, err := client.NewUser(
-		openapi.Username("bob"),
-		bobPrivKey,
-		client.NewClient(openapiClient, openapi.Username("bob")),
-	)
-	if err != nil {
-		logger.Fatal("NewUser", zap.Error(err))
-	}
-
-	err = alice.Register(ctx)
-	if err != nil {
-		logger.Fatal("alice.Register", zap.Error(err))
-	}
-
-	err = bob.Register(ctx)
-	if err != nil {
-		logger.Fatal("bob.Register", zap.Error(err))
-	}
-
-	err = alice.SendMessage(
-		ctx,
-		types.PlainText("hello, bob"),
-		openapi.Username("bob"),
-	)
-	if err != nil {
-		logger.Fatal("alice.SendMessage", zap.Error(err))
-	}
-
-	messages, err := bob.FetchMessages(ctx)
-	if err != nil {
-		logger.Fatal("bob.FetchMessages", zap.Error(err))
-	}
-	for _, message := range messages {
-		fmt.Printf("%s -> %s: %q\n", message.Sender, message.Recipient, string(message.Plaintext))
+		logger.Fatal("ui.Run", zap.Error(err))
 	}
 }
 
@@ -154,3 +109,58 @@ func writeKeys(username string) error {
 
 	return nil
 }
+
+// alicePrivKey, err := loadPrivateKey("alice")
+// if err != nil {
+// 	logger.Fatal("loadPrivateKey", zap.Error(err))
+// }
+
+// alice, err := client.NewUser(
+// 	openapi.Username("alice"),
+// 	alicePrivKey,
+// 	client.NewClient(openapiClient, openapi.Username("alice")),
+// )
+// if err != nil {
+// 	logger.Fatal("NewUser", zap.Error(err))
+// }
+
+// bobPrivKey, err := loadPrivateKey("bob")
+// if err != nil {
+// 	logger.Fatal("loadPrivateKey", zap.Error(err))
+// }
+
+// bob, err := client.NewUser(
+// 	openapi.Username("bob"),
+// 	bobPrivKey,
+// 	client.NewClient(openapiClient, openapi.Username("bob")),
+// )
+// if err != nil {
+// 	logger.Fatal("NewUser", zap.Error(err))
+// }
+
+// err = alice.Register(ctx)
+// if err != nil {
+// 	logger.Fatal("alice.Register", zap.Error(err))
+// }
+
+// err = bob.Register(ctx)
+// if err != nil {
+// 	logger.Fatal("bob.Register", zap.Error(err))
+// }
+
+// err = alice.SendMessage(
+// 	ctx,
+// 	types.PlainText("hello, bob"),
+// 	openapi.Username("bob"),
+// )
+// if err != nil {
+// 	logger.Fatal("alice.SendMessage", zap.Error(err))
+// }
+
+// messages, err := bob.FetchMessages(ctx)
+// if err != nil {
+// 	logger.Fatal("bob.FetchMessages", zap.Error(err))
+// }
+// for _, message := range messages {
+// 	fmt.Printf("%s -> %s: %q\n", message.Sender, message.Recipient, string(message.Plaintext))
+// }
