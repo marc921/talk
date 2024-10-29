@@ -23,12 +23,12 @@ func NewUser(
 	name openapi.Username,
 	privKey *rsa.PrivateKey,
 	client *Client,
-) (*User, error) {
+) *User {
 	return &User{
 		name:   name,
 		key:    privKey,
 		client: client,
-	}, nil
+	}
 }
 
 func (u *User) Register(ctx context.Context) error {
