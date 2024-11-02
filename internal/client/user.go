@@ -14,21 +14,28 @@ import (
 
 type User struct {
 	name      openapi.Username
+	storage   *Storage
 	key       *rsa.PrivateKey
-	authToken *string
 	client    *Client
+	authToken *string
 }
 
 func NewUser(
 	name openapi.Username,
-	privKey *rsa.PrivateKey,
-	client *Client,
-) *User {
-	return &User{
-		name:   name,
-		key:    privKey,
-		client: client,
+	storage *Storage,
+	openapiClient *openapi.ClientWithResponses,
+) (*User, error) {
+	privKey, err := storage.GetOrCreatePrivateKey(name)
+	if err != nil {
+		return nil, fmt.Errorf("GetOrCreatePrivateKey: %w", err)
 	}
+	user := &User{
+		name:    name,
+		storage: storage,
+		key:     privKey,
+		client:  NewClient(openapiClient, name),
+	}
+	return user, nil
 }
 
 func (u *User) Register(ctx context.Context) error {
@@ -68,6 +75,14 @@ func (u *User) Authenticate(ctx context.Context) error {
 	return nil
 }
 
+func (u *User) GetPublicUser(ctx context.Context, name openapi.Username) (*types.PublicUser, error) {
+	resp, err := u.client.GetPublicUser(ctx, name)
+	if err != nil {
+		return nil, fmt.Errorf("client.GetPublicUser: %w", err)
+	}
+	return resp, nil
+}
+
 func (u *User) SendMessage(ctx context.Context, plaintext types.PlainText, recipientName openapi.Username) error {
 	recipient, err := u.client.GetPublicUser(ctx, recipientName)
 	if err != nil {
@@ -98,6 +113,7 @@ func (u *User) SendMessage(ctx context.Context, plaintext types.PlainText, recip
 }
 
 func (u *User) FetchMessages(ctx context.Context) ([]*types.PlainMessage, error) {
+	// TODO: read existing messages from storage
 	if u.authToken == nil {
 		err := u.Authenticate(ctx)
 		if err != nil {
@@ -116,8 +132,8 @@ func (u *User) FetchMessages(ctx context.Context) ([]*types.PlainMessage, error)
 			return nil, fmt.Errorf("rsa.DecryptPKCS1v15: %w", err)
 		}
 		plainMessages = append(plainMessages, &types.PlainMessage{
-			Sender:    encryptedMessage.Sender,
-			Recipient: encryptedMessage.Recipient,
+			From:      encryptedMessage.Sender,
+			To:        encryptedMessage.Recipient,
 			Plaintext: plaintext,
 		})
 	}

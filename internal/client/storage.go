@@ -19,6 +19,21 @@ func NewStorage(homeDir string) *Storage {
 	return &Storage{HomeDir: homeDir}
 }
 
+func (s *Storage) ListUsers() ([]string, error) {
+	usersDir := path.Join(s.HomeDir, "users")
+	dirEntries, err := os.ReadDir(usersDir)
+	if err != nil {
+		return nil, fmt.Errorf("os.ReadDir: %w", err)
+	}
+	var users []string
+	for _, entry := range dirEntries {
+		if entry.IsDir() {
+			users = append(users, entry.Name())
+		}
+	}
+	return users, nil
+}
+
 func (s *Storage) GetOrCreatePrivateKey(username string) (*rsa.PrivateKey, error) {
 	privKeyPath := path.Join(s.HomeDir, "users", username, "private.pem")
 	_, err := os.Stat(privKeyPath)

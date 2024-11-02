@@ -3,6 +3,7 @@ package types
 import (
 	"crypto/rsa"
 	"errors"
+	"time"
 
 	"github.com/marc921/talk/internal/types/openapi"
 )
@@ -17,7 +18,16 @@ type PublicUser struct {
 }
 
 type PlainMessage struct {
-	Sender    openapi.Username
-	Recipient openapi.Username
-	Plaintext PlainText
+	From        openapi.Username
+	To          openapi.Username
+	Plaintext   PlainText
+	SentAt      *time.Time
+	DeliveredAt *time.Time
+	ReadAt      *time.Time
+}
+
+type Conversation struct {
+	LocalUser  openapi.Username
+	RemoteUser openapi.Username
+	Messages   []*PlainMessage
 }

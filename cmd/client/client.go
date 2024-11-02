@@ -30,14 +30,16 @@ func main() {
 	if err != nil {
 		logger.Fatal("NewUI", zap.Error(err))
 	}
-	defer ui.Close()
+	defer ui.Quit()
 
 	err = ui.Run(ctx)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return
+		}
 		logger.Fatal("ui.Run", zap.Error(err))
 	}
 }
-
 
 // err = alice.SendMessage(
 // 	ctx,
