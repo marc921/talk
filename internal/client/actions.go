@@ -156,3 +156,33 @@ func (a *ActionSelectConversation) String() string {
 	return "SelectConversation"
 }
 
+type ActionSendMessage struct {
+	localUser      *User
+	remoteUsername string
+	plaintext      types.PlainText
+}
+
+func (a *ActionSendMessage) Do(ctx context.Context, u *UI) error {
+	err := a.localUser.SendMessage(ctx, a.plaintext, a.remoteUsername)
+	if err != nil {
+		return fmt.Errorf("SendMessage(%#v): %w", a, err)
+	}
+	return nil
+}
+
+func (a *ActionSendMessage) String() string {
+	return "SendMessage"
+}
+
+type ActionSwitchTab struct {
+	tabIndex TabIndex
+}
+
+func (a *ActionSwitchTab) Do(ctx context.Context, u *UI) error {
+	u.drawer.OnEvent(&EventSwitchTab{tabIndex: a.tabIndex})
+	return nil
+}
+
+func (a *ActionSwitchTab) String() string {
+	return "SwitchTab"
+}

@@ -3,12 +3,12 @@ package client
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/x509"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"os"
 	"path"
+
+	"github.com/marc921/talk/internal/cryptography"
 )
 
 type Storage struct {
@@ -52,13 +52,10 @@ func (s *Storage) GetOrCreatePrivateKey(username string) (*rsa.PrivateKey, error
 	if err != nil {
 		return nil, fmt.Errorf("os.ReadFile: %w", err)
 	}
-	privateKeyBlock, _ := pem.Decode(privateKeyPEM)
-	if privateKeyBlock == nil {
-		return nil, fmt.Errorf("pem.Decode: no key found")
-	}
-	privateKey, err := x509.ParsePKCS1PrivateKey(privateKeyBlock.Bytes)
+
+	privateKey, err := cryptography.UnmarshalPrivateKey(privateKeyPEM)
 	if err != nil {
-		return nil, fmt.Errorf("x509.ParsePKCS1PrivateKey: %w", err)
+		return nil, fmt.Errorf("cryptography.UnmarshalPrivateKey: %w", err)
 	}
 	return privateKey, nil
 }
@@ -68,36 +65,28 @@ func (s *Storage) WriteKeys(username string) error {
 	privKeyPath := path.Join(userDir, "private.pem")
 	pubKeyPath := path.Join(userDir, "public.pem")
 
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	privateKey, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
 		return fmt.Errorf("rsa.GenerateKey: %w", err)
 	}
 
-	privateKeyBytes := x509.MarshalPKCS1PrivateKey(privateKey)
-	privateKeyPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: privateKeyBytes,
-	})
+	privateKeyBytes := cryptography.MarshalPrivateKey(privateKey)
 
 	err = os.MkdirAll(userDir, 0755)
 	if err != nil {
 		return fmt.Errorf("os.MkdirAll: %w", err)
 	}
 
-	err = os.WriteFile(privKeyPath, privateKeyPEM, 0644)
+	err = os.WriteFile(privKeyPath, privateKeyBytes, 0644)
 	if err != nil {
 		return fmt.Errorf("os.WriteFile: %w", err)
 	}
 
 	publicKey := &privateKey.PublicKey
 
-	publicKeyBytes := x509.MarshalPKCS1PublicKey(publicKey)
+	publicKeyBytes := cryptography.MarshalPublicKey(publicKey)
 
-	publicKeyPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PUBLIC KEY",
-		Bytes: publicKeyBytes,
-	})
-	err = os.WriteFile(pubKeyPath, publicKeyPEM, 0644)
+	err = os.WriteFile(pubKeyPath, publicKeyBytes, 0644)
 	if err != nil {
 		return fmt.Errorf("os.WriteFile: %w", err)
 	}

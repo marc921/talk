@@ -29,8 +29,15 @@ func NewUsersTab(base *BaseComponent) *UsersTab {
 func (c *UsersTab) CanFocus() bool {
 	return true
 }
+
 func (c *UsersTab) Focus(focused bool) {
+	if c.hasFocus == focused {
+		return
+	}
 	c.hasFocus = focused
+	if focused {
+		c.actions <- &ActionSetMode{mode: ModeNormal}
+	}
 }
 
 func (c *UsersTab) OnEvent(event any) {
@@ -49,6 +56,7 @@ func (c *UsersTab) OnEvent(event any) {
 				break
 			}
 		}
+		c.actions <- &ActionSwitchTab{tabIndex: TabConversations}
 	case *EventFocus:
 		c.hasFocus = true
 	case *tcell.EventKey:
@@ -83,7 +91,7 @@ func (c *UsersTab) OnEvent(event any) {
 }
 
 func (c *UsersTab) Render() {
-	c.drawCursor.Reset(c.rect)
+	c.drawCursor.Reset()
 	style := tcell.StyleDefault.Bold(true).Underline(true)
 	if c.hasFocus {
 		style = style.Foreground(tcell.ColorDeepSkyBlue)
@@ -92,7 +100,7 @@ func (c *UsersTab) Render() {
 
 	c.drawCursor.Newline()
 	for i, user := range c.users {
-		line := fmt.Sprintf(" %d. "+user.name, i+1)
+		line := fmt.Sprintf(" %d. %s", i+1, user.name)
 		style := tcell.StyleDefault
 		if i == c.selected {
 			style = style.Foreground(tcell.ColorGreen).Bold(true)

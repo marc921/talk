@@ -16,7 +16,8 @@ type TabIndex int
 const (
 	TabUsers TabIndex = iota
 	TabConversations
-	// TabMessages
+	TabMessages
+	
 	TabCount // Keep this last
 )
 
@@ -28,32 +29,42 @@ func NewDrawer(screen tcell.Screen, actions chan<- Action) *Drawer {
 		components: []Component{
 			NewHeader(NewBaseComponent(
 				screen,
-				&Rect{X: 0, Y: 0, Width: width, Height: 1},
+				&Rect{Left: 0, Top: 0, Width: width, Height: 1},
 				actions,
 			)),
 			NewSeparatorLine(NewBaseComponent(
 				screen,
-				&Rect{X: 0, Y: 1, Width: width, Height: 1},
+				&Rect{Left: 0, Top: 1, Width: width, Height: 1},
 				actions,
 			)),
 			NewUsersTab(NewBaseComponent(
 				screen,
-				&Rect{X: 0, Y: 2, Width: leftSideWidth, Height: 10},
+				&Rect{Left: 0, Top: 2, Width: leftSideWidth, Height: 10},
 				actions,
 			)),
 			NewSeparatorLine(NewBaseComponent(
 				screen,
-				&Rect{X: 0, Y: 12, Width: leftSideWidth, Height: 1},
+				&Rect{Left: 0, Top: 12, Width: leftSideWidth, Height: 1},
 				actions,
 			)),
 			NewConversationsTab(NewBaseComponent(
 				screen,
-				&Rect{X: 0, Y: 13, Width: leftSideWidth, Height: height - 13},
+				&Rect{Left: 0, Top: 13, Width: leftSideWidth, Height: height - 13},
 				actions,
 			)),
 			NewSeparatorLine(NewBaseComponent(
 				screen,
-				&Rect{X: leftSideWidth, Y: 2, Width: 1, Height: height - 2},
+				&Rect{Left: leftSideWidth, Top: 2, Width: 1, Height: height - 2},
+				actions,
+			)),
+			NewMessagesTab(NewBaseComponent(
+				screen,
+				&Rect{Left: leftSideWidth + 1, Top: 2, Width: width - leftSideWidth - 1, Height: height - 2},
+				actions,
+			)),
+			NewErrorModal(NewBaseComponent(
+				screen,
+				&Rect{Left: 0, Top: 0, Width: width, Height: height},
 				actions,
 			)),
 		},
@@ -62,6 +73,8 @@ func NewDrawer(screen tcell.Screen, actions chan<- Action) *Drawer {
 
 func (d *Drawer) OnEvent(event any) {
 	switch event := event.(type) {
+	case *EventSwitchTab:
+		d.focusedTab = &event.tabIndex
 	case *tcell.EventKey:
 		switch event.Key() {
 		case tcell.KeyTab:

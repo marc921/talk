@@ -31,6 +31,7 @@ func UnmarshalPublicKey(pemBytes []byte) (*rsa.PublicKey, error) {
 
 func MarshalPrivateKey(privateKey *rsa.PrivateKey) []byte {
 	privateKeyBytes := x509.MarshalPKCS1PrivateKey(privateKey)
+
 	privateKeyPEM := pem.EncodeToMemory(&pem.Block{
 		Type:  "RSA PRIVATE KEY",
 		Bytes: privateKeyBytes,

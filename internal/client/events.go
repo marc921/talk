@@ -36,3 +36,7 @@ type EventNewConversation struct {
 type EventSelectConversation struct {
 	conversation *types.Conversation
 }
+
+type EventSwitchTab struct {
+	tabIndex TabIndex
+}

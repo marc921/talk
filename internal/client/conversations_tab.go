@@ -10,7 +10,7 @@ import (
 type ConversationsTab struct {
 	*BaseComponent
 	localUser             *User
-	conversations         []*types.Conversation // conversations by remote user name
+	conversations         []*types.Conversation
 	hasFocus              bool
 	selected              int
 	hovered               int
@@ -19,12 +19,11 @@ type ConversationsTab struct {
 }
 
 func NewConversationsTab(base *BaseComponent) *ConversationsTab {
-	c := &ConversationsTab{
+	return &ConversationsTab{
 		BaseComponent: base,
 		selected:      -1,
 		mode:          ModeNormal,
 	}
-	return c
 }
 
 func (c *ConversationsTab) CanFocus() bool {
@@ -32,7 +31,13 @@ func (c *ConversationsTab) CanFocus() bool {
 }
 
 func (c *ConversationsTab) Focus(focused bool) {
+	if c.hasFocus == focused {
+		return
+	}
 	c.hasFocus = focused
+	if focused {
+		c.actions <- &ActionSetMode{mode: ModeNormal}
+	}
 }
 
 func (c *ConversationsTab) OnEvent(event any) {
@@ -41,6 +46,7 @@ func (c *ConversationsTab) OnEvent(event any) {
 		c.mode = event.mode
 	case *EventSelectUser:
 		c.localUser = event.user
+		c.conversations = nil
 		c.actions <- &ActionFetchMessages{user: c.localUser}
 	case *EventAddMessages:
 		for _, message := range event.messages {
@@ -82,6 +88,7 @@ func (c *ConversationsTab) OnEvent(event any) {
 				break
 			}
 		}
+		c.actions <- &ActionSwitchTab{tabIndex: TabMessages}
 	case *EventFocus:
 		c.hasFocus = true
 	case *tcell.EventKey:
@@ -122,7 +129,7 @@ func (c *ConversationsTab) Render() {
 	if c.localUser == nil {
 		return
 	}
-	c.drawCursor.Reset(c.rect)
+	c.drawCursor.Reset()
 	style := tcell.StyleDefault.Bold(true).Underline(true)
 	if c.hasFocus {
 		style = style.Foreground(tcell.ColorDeepSkyBlue)

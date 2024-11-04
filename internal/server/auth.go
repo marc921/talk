@@ -13,16 +13,16 @@ import (
 )
 
 type Authenticator struct {
-	challengeSecretKey  string
-	authSecretKey       string
+	challengeSecretKey  []byte
+	authSecretKey       []byte
 	nonceLen            int
 	challengeExpiration time.Duration
 	authExpiration      time.Duration
 }
 
 func NewAuthenticator(
-	challengeSecretKey string,
-	authSecretKey string,
+	challengeSecretKey []byte,
+	authSecretKey []byte,
 	nonceLen int,
 	challengeExpiration time.Duration,
 	authExpiration time.Duration,
@@ -53,7 +53,7 @@ func (a *Authenticator) GenerateChallengeJWT(username openapi.Username, nonce st
 		"exp":   time.Now().Add(a.challengeExpiration).Unix(),
 	})
 
-	tokenString, err := token.SignedString([]byte(a.challengeSecretKey))
+	tokenString, err := token.SignedString(a.challengeSecretKey)
 	if err != nil {
 		return "", fmt.Errorf("token.SignedString: %w", err)
 	}
@@ -83,7 +83,7 @@ func (a *Authenticator) VerifyAuthChallenge(
 	token, err := jwt.Parse(
 		signedAuthChallenge.Token,
 		func(token *jwt.Token) (any, error) {
-			return []byte(a.challengeSecretKey), nil
+			return a.challengeSecretKey, nil
 		},
 		jwt.WithValidMethods([]string{"HS256"}),
 	)
@@ -141,7 +141,7 @@ func (a *Authenticator) GenerateAuthJWT(username openapi.Username) (string, erro
 		"exp": time.Now().Add(a.authExpiration).Unix(),
 	})
 
-	tokenString, err := token.SignedString([]byte(a.authSecretKey))
+	tokenString, err := token.SignedString(a.authSecretKey)
 	if err != nil {
 		return "", fmt.Errorf("token.SignedString: %w", err)
 	}

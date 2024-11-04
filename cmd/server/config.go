@@ -9,9 +9,9 @@ import (
 
 type Config struct {
 	// Used to sign the challenge JWTs
-	AuthChallengeSecretKey string `env:"AUTH_CHALLENGE_SECRET_KEY, required"`
+	AuthChallengeSecretKey []byte `env:"AUTH_CHALLENGE_SECRET_KEY, required"`
 	// Used to sign the auth tokens
-	AuthTokenSecretKey string `env:"AUTH_TOKEN_SECRET_KEY, required"`
+	AuthTokenSecretKey []byte `env:"AUTH_TOKEN_SECRET_KEY, required"`
 }
 
 func LoadConfig(ctx context.Context) (*Config, error) {

@@ -67,7 +67,11 @@ func (u *UI) Run(ctx context.Context) error {
 				if errors.Is(err, ErrQuit) {
 					return nil
 				}
-				return fmt.Errorf("action.Do(%s): %w", action.String(), err)
+				u.drawer.OnEvent(
+					&EventSetError{
+						err: fmt.Errorf("action.Do(%s): %w", action.String(), err),
+					},
+				)
 			}
 		default:
 			ev := u.drawer.screen.PollEvent()

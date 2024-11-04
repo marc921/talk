@@ -30,19 +30,19 @@ func (c *SeparatorLine) OnEvent(event any) {
 }
 
 func (c *SeparatorLine) Render() {
-	c.drawCursor.Reset(c.rect)
+	c.drawCursor.Reset()
 	var r rune
-	if c.rect.Width == 1 {
+	if c.bounds.Width == 1 {
 		r = '│' // '│', U+2502, BOX DRAWINGS LIGHT VERTICAL
-	} else if c.rect.Height == 1 {
+	} else if c.bounds.Height == 1 {
 		r = '─' // '─', U+2500, BOX DRAWINGS LIGHT HORIZONTAL
 	} else {
 		c.actions <- &ActionSetError{
-			err: fmt.Errorf("invalid separator line dimensions: %v", c.rect),
+			err: fmt.Errorf("invalid separator line dimensions: %v", c.bounds),
 		}
 	}
-	for y := c.rect.Y; y < c.rect.Y+c.rect.Height; y++ {
-		for x := c.rect.X; x < c.rect.X+c.rect.Width; x++ {
+	for y := c.bounds.Top; y < c.bounds.Top+c.bounds.Height; y++ {
+		for x := c.bounds.Left; x < c.bounds.Left+c.bounds.Width; x++ {
 			c.screen.SetContent(x, y, r, nil, tcell.StyleDefault)
 		}
 	}
