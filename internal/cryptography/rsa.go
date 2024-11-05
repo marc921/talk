@@ -1,11 +1,20 @@
 package cryptography
 
 import (
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
 )
+
+func GenerateKey() (*rsa.PrivateKey, error) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, fmt.Errorf("rsa.GenerateKey: %w", err)
+	}
+	return privateKey, nil
+}
 
 func MarshalPublicKey(publicKey *rsa.PublicKey) []byte {
 	publicKeyBytes := x509.MarshalPKCS1PublicKey(publicKey)
