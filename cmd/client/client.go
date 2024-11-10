@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"errors"
+	"path"
 
 	"go.uber.org/zap"
 
 	"github.com/marc921/talk/internal/client"
+	"github.com/marc921/talk/internal/client/database"
 )
 
 func main() {
@@ -26,7 +28,12 @@ func main() {
 		logger.Fatal("LoadConfig", zap.Error(err))
 	}
 
-	ui, err := client.NewUI(config)
+	db, err := database.NewSQLite3DB(path.Join(config.HomeDir, "database.sqlite3"))
+	if err != nil {
+		logger.Fatal("database.NewSQLite3DB", zap.Error(err))
+	}
+
+	ui, err := client.NewUI(config, db)
 	if err != nil {
 		logger.Fatal("NewUI", zap.Error(err))
 	}

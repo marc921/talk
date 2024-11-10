@@ -9,10 +9,9 @@ import (
 )
 
 type Conversation struct {
-	ID               int64
-	LocalUserName    string
-	RemoteUserName   string
-	LastSymmetricKey []byte
+	ID             int64
+	LocalUserName  string
+	RemoteUserName string
 }
 
 type LocalUser struct {

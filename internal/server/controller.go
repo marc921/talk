@@ -30,7 +30,7 @@ func NewServerController(logger *zap.Logger) *ServerController {
 func (s *ServerController) AddUser(username openapi.Username, publicKeyBytes []byte) (bool, error) {
 	publicKey, err := cryptography.UnmarshalPublicKey(publicKeyBytes)
 	if err != nil {
-		return false, fmt.Errorf("ParsePublicKey: %w", err)
+		return false, fmt.Errorf("cryptography.UnmarshalPublicKey: %w", err)
 	}
 	if existingPublicKey, ok := s.usersPublicKeys[username]; ok {
 		if existingPublicKey.Equal(publicKey) {

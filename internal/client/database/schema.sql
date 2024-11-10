@@ -11,7 +11,6 @@ CREATE TABLE conversations (
 	id INTEGER PRIMARY KEY,
 	local_user_name TEXT REFERENCES local_users(name) NOT NULL,
 	remote_user_name TEXT REFERENCES public_users(name) NOT NULL,
-	last_symmetric_key BLOB,
 	UNIQUE (local_user_name, remote_user_name)
 );
 CREATE TABLE messages (
@@ -28,4 +27,5 @@ CREATE TABLE messages (
 INSERT INTO "schema_migrations" (version) VALUES
   ('20241105135553'),
   ('20241105140048'),
-  ('20241105142502');
+  ('20241105142502'),
+  ('20241110121425');

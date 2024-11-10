@@ -1,7 +1,5 @@
 package client
 
-import "github.com/marc921/talk/internal/types"
-
 type EventSetMode struct {
 	mode Mode
 }
@@ -21,20 +19,16 @@ type EventNewUser struct {
 	user *User
 }
 
-type EventAddMessages struct {
-	messages []*types.PlainMessage
+type EventUpdateUser struct {
+	user *User
 }
 
 type EventSetError struct {
 	err error
 }
 
-type EventNewConversation struct {
-	conversation *types.Conversation
-}
-
 type EventSelectConversation struct {
-	conversation *types.Conversation
+	conversation *Conversation
 }
 
 type EventSwitchTab struct {

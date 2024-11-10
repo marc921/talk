@@ -8,8 +8,11 @@ build:
 	@docker login -u ${DOCKER_USER} --password-stdin <<< ${DOCKER_PASSWORD}
 	docker push $(DOCKER_USER)/$(COMPONENT):latest
 
-.PHONY: generate-client-db
-generate-client-db:
+.PHONY: recreate-client-db
+recreate-client-db:
 	dbmate drop
 	dbmate up
-	sqlc -f ${DB_CLIENT_DIR}/sqlc.yaml generate
+
+.PHONY: generate
+generate:	# (Re)Generate automatically generated code, including sqlc queries and openapi client
+	go generate ./...

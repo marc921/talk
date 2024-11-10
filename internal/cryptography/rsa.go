@@ -9,7 +9,7 @@ import (
 )
 
 func GenerateKey() (*rsa.PrivateKey, error) {
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	privateKey, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
 		return nil, fmt.Errorf("rsa.GenerateKey: %w", err)
 	}

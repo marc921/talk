@@ -2,13 +2,12 @@ package client
 
 import (
 	"github.com/gdamore/tcell/v2"
-	"github.com/marc921/talk/internal/types"
 )
 
 type MessagesTab struct {
 	*BaseComponent
 	localUser        *User
-	conversation     *types.Conversation
+	conversation     *Conversation
 	hasFocus         bool
 	mode             Mode
 	newMessageBuffer string
@@ -55,11 +54,10 @@ func (c *MessagesTab) OnEvent(event any) {
 			if c.mode == ModeInsert {
 				c.actions <- &ActionSendMessage{
 					localUser:      c.localUser,
-					remoteUsername: c.conversation.RemoteUser,
+					remoteUsername: c.conversation.dbConv.RemoteUserName,
 					plaintext:      []byte(c.newMessageBuffer),
 				}
 				c.newMessageBuffer = ""
-				c.actions <- &ActionSetMode{mode: ModeNormal}
 			}
 		case tcell.KeyBackspace, tcell.KeyBackspace2:
 			if c.mode == ModeInsert && len(c.newMessageBuffer) > 0 {
@@ -85,11 +83,11 @@ func (c *MessagesTab) Render() {
 	c.PrintTextStyle("Messages", style)
 
 	c.drawCursor.Newline()
-	for _, message := range c.conversation.Messages {
-		if message.From == c.localUser.name {
-			c.PrintTextRightAlign(string(message.Plaintext))
+	for _, message := range c.conversation.messages {
+		if message.Sender == c.localUser.name {
+			c.PrintTextRightAlign(string(message.Content))
 		} else {
-			c.PrintText(string(message.Plaintext))
+			c.PrintText(string(message.Content))
 		}
 		c.drawCursor.Newline()
 	}

@@ -25,9 +25,3 @@ type PlainMessage struct {
 	DeliveredAt *time.Time
 	ReadAt      *time.Time
 }
-
-type Conversation struct {
-	LocalUser  openapi.Username
-	RemoteUser openapi.Username
-	Messages   []*PlainMessage
-}

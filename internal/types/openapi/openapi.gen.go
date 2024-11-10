@@ -48,9 +48,10 @@ type JWT struct {
 
 // Message defines model for Message.
 type Message struct {
-	Ciphertext CipherText `json:"ciphertext"`
-	Recipient  Username   `json:"recipient"`
-	Sender     Username   `json:"sender"`
+	CipherSymKey CipherText `json:"cipher_sym_key"`
+	Ciphertext   CipherText `json:"ciphertext"`
+	Recipient    Username   `json:"recipient"`
+	Sender       Username   `json:"sender"`
 }
 
 // PublicUser defines model for PublicUser.

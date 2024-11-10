@@ -9,6 +9,17 @@ import (
 	"context"
 )
 
+const getLocalUserByName = `-- name: GetLocalUserByName :one
+SELECT name, private_key FROM local_users WHERE name = ?
+`
+
+func (q *Queries) GetLocalUserByName(ctx context.Context, name string) (*LocalUser, error) {
+	row := q.db.QueryRowContext(ctx, getLocalUserByName, name)
+	var i LocalUser
+	err := row.Scan(&i.Name, &i.PrivateKey)
+	return &i, err
+}
+
 const insertLocalUser = `-- name: InsertLocalUser :one
 INSERT INTO local_users (name, private_key) VALUES (?, ?) RETURNING name, private_key
 `
@@ -18,30 +29,30 @@ type InsertLocalUserParams struct {
 	PrivateKey []byte
 }
 
-func (q *Queries) InsertLocalUser(ctx context.Context, arg InsertLocalUserParams) (LocalUser, error) {
+func (q *Queries) InsertLocalUser(ctx context.Context, arg InsertLocalUserParams) (*LocalUser, error) {
 	row := q.db.QueryRowContext(ctx, insertLocalUser, arg.Name, arg.PrivateKey)
 	var i LocalUser
 	err := row.Scan(&i.Name, &i.PrivateKey)
-	return i, err
+	return &i, err
 }
 
 const listLocalUsers = `-- name: ListLocalUsers :many
 SELECT name, private_key FROM local_users
 `
 
-func (q *Queries) ListLocalUsers(ctx context.Context) ([]LocalUser, error) {
+func (q *Queries) ListLocalUsers(ctx context.Context) ([]*LocalUser, error) {
 	rows, err := q.db.QueryContext(ctx, listLocalUsers)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []LocalUser
+	var items []*LocalUser
 	for rows.Next() {
 		var i LocalUser
 		if err := rows.Scan(&i.Name, &i.PrivateKey); err != nil {
 			return nil, err
 		}
-		items = append(items, i)
+		items = append(items, &i)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err

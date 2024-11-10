@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/marc921/talk/internal/client/database/sqlcgen"
+	"github.com/marc921/talk/internal/cryptography"
 	"github.com/marc921/talk/internal/types"
 )
 
@@ -49,19 +51,21 @@ func (a *ActionSetMode) Do(ctx context.Context, u *UI) error {
 }
 
 func (a *ActionSetMode) String() string {
-	return "Mode"
+	return "SetMode"
 }
 
 type ActionListUsers struct{}
 
 func (a *ActionListUsers) Do(ctx context.Context, u *UI) error {
-	usernames, err := u.storage.ListUsers()
+	queries := sqlcgen.New(u.db)
+	localUsers, err := queries.ListLocalUsers(ctx)
 	if err != nil {
-		return fmt.Errorf("storage.ListUsers: %w", err)
+		return fmt.Errorf("queries.ListLocalUsers: %w", err)
 	}
-	users := make([]*User, 0, len(usernames))
-	for _, username := range usernames {
-		user, err := NewUser(username, u.storage, u.openapiClient)
+	users := make([]*User, 0, len(localUsers))
+	for _, localUser := range localUsers {
+		localUser := localUser
+		user, err := NewUser(localUser, u.db, u.openapiClient)
 		if err != nil {
 			return fmt.Errorf("NewUser: %w", err)
 		}
@@ -93,10 +97,45 @@ type ActionCreateUser struct {
 }
 
 func (a *ActionCreateUser) Do(ctx context.Context, u *UI) error {
-	user, err := u.CreateUser(ctx, a.username)
+	tx, err := u.db.Begin()
 	if err != nil {
-		return fmt.Errorf("CreateUser: %w", err)
+		return err
 	}
+	defer tx.Rollback()
+	txQueries := sqlcgen.New(u.db).WithTx(tx)
+
+	// Create user locally
+	privKey, err := cryptography.GenerateKey()
+	if err != nil {
+		return fmt.Errorf("cryptography.GenerateKey: %w", err)
+	}
+	privKeyBytes := cryptography.MarshalPrivateKey(privKey)
+
+	localUser, err := txQueries.InsertLocalUser(ctx, sqlcgen.InsertLocalUserParams{
+		Name:       a.username,
+		PrivateKey: privKeyBytes,
+	})
+	if err != nil {
+		return fmt.Errorf("queries.InsertLocalUser: %w", err)
+	}
+
+	user, err := NewUser(localUser, u.db, u.openapiClient)
+	if err != nil {
+		return fmt.Errorf("NewUser: %w", err)
+	}
+
+	// Attempt to register user on distant server, fail if already exists
+	pubKeyBytes := cryptography.MarshalPublicKey(&privKey.PublicKey)
+	err = user.client.RegisterUser(ctx, pubKeyBytes)
+	if err != nil {
+		return fmt.Errorf("client.RegisterUser: %w", err)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("tx.Commit: %w", err)
+	}
+
 	u.drawer.OnEvent(&EventNewUser{user: user})
 	return nil
 }
@@ -110,11 +149,11 @@ type ActionFetchMessages struct {
 }
 
 func (a *ActionFetchMessages) Do(ctx context.Context, u *UI) error {
-	messages, err := a.user.FetchMessages(ctx)
+	err := a.user.FetchMessages(ctx)
 	if err != nil {
-		return fmt.Errorf("FetchMessages: %w", err)
+		return fmt.Errorf("user.FetchMessages: %w", err)
 	}
-	u.drawer.OnEvent(&EventAddMessages{messages: messages})
+	u.drawer.OnEvent(&EventUpdateUser{user: a.user})
 	return nil
 }
 
@@ -128,14 +167,11 @@ type ActionCreateConversation struct {
 }
 
 func (a *ActionCreateConversation) Do(ctx context.Context, u *UI) error {
-	_, err := a.localUser.GetPublicUser(ctx, a.remoteUsername)
+	err := a.localUser.CreateConversation(ctx, a.remoteUsername)
 	if err != nil {
-		return fmt.Errorf("client.GetPublicUser: %w", err)
+		return fmt.Errorf("localUser.CreateConversation: %w", err)
 	}
-	u.drawer.OnEvent(&EventNewConversation{conversation: &types.Conversation{
-		LocalUser:  a.localUser.name,
-		RemoteUser: a.remoteUsername,
-	}})
+	u.drawer.OnEvent(&EventUpdateUser{user: a.localUser})
 	return nil
 }
 
@@ -144,7 +180,7 @@ func (a *ActionCreateConversation) String() string {
 }
 
 type ActionSelectConversation struct {
-	conversation *types.Conversation
+	conversation *Conversation
 }
 
 func (a *ActionSelectConversation) Do(ctx context.Context, u *UI) error {

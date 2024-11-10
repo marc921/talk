@@ -242,9 +242,12 @@ components:
           $ref: '#/components/schemas/Username'
         recipient:
           $ref: '#/components/schemas/Username'
+        cipher_sym_key:
+          $ref: '#/components/schemas/CipherText'
         ciphertext:
           $ref: '#/components/schemas/CipherText'
       required:
         - sender
         - recipient
+        - cipher_sym_key
         - ciphertext

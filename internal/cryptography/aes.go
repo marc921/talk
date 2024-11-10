@@ -7,14 +7,24 @@ import (
 	"fmt"
 )
 
+const AESKeySize = 32
+
+func GenerateAESKey() ([]byte, error) {
+	key := make([]byte, AESKeySize)
+	if _, err := rand.Read(key); err != nil {
+		return nil, fmt.Errorf("rand.Read: %w", err)
+	}
+	return key, nil
+}
+
 // AESCipher handles AES encryption and decryption for a given symmetric key.
 type AESCipher struct {
 	gcm cipher.AEAD
 }
 
 func NewAESCipher(key []byte) (*AESCipher, error) {
-	if len(key) != 32 {
-		return nil, fmt.Errorf("key must be 32 bytes long")
+	if len(key) != AESKeySize {
+		return nil, fmt.Errorf("key must be %d bytes long", AESKeySize)
 	}
 
 	cipherBlock, err := aes.NewCipher(key)

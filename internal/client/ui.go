@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 
@@ -12,7 +13,7 @@ import (
 type UI struct {
 	drawer        *Drawer
 	actions       <-chan Action
-	storage       *Storage
+	db            *sql.DB
 	openapiClient *openapi.ClientWithResponses
 }
 
@@ -23,7 +24,10 @@ const (
 	ModeInsert Mode = "Insert"
 )
 
-func NewUI(config *Config) (*UI, error) {
+func NewUI(
+	config *Config,
+	db *sql.DB,
+) (*UI, error) {
 	screen, err := tcell.NewScreen()
 	if err != nil {
 		return nil, fmt.Errorf("tcell.NewScreen: %w", err)
@@ -31,8 +35,6 @@ func NewUI(config *Config) (*UI, error) {
 	if err := screen.Init(); err != nil {
 		return nil, fmt.Errorf("screen.Init: %w", err)
 	}
-
-	storage := NewStorage(config.HomeDir)
 
 	openapiClient, err := openapi.NewClientWithResponses(
 		config.Server.URL,
@@ -46,7 +48,7 @@ func NewUI(config *Config) (*UI, error) {
 	return &UI{
 		drawer:        NewDrawer(screen, actions),
 		actions:       actions,
-		storage:       storage,
+		db:            db,
 		openapiClient: openapiClient,
 	}, nil
 }
@@ -87,49 +89,8 @@ func (u *UI) Run(ctx context.Context) error {
 				switch ev.Key() {
 				case tcell.KeyCtrlC:
 					return nil
-				// case tcell.KeyEscape:
-				// 	u.mode = ModeNormal
-				// 	u.page = PageHome
-				// case tcell.KeyEnter:
-				// 	if u.onEnter != nil {
-				// 		u.currentErr = u.onEnter(u.buffer)
-				// 		u.buffer = ""
-				// 		u.onEnter = nil
-				// 		u.mode = ModeNormal
-				// 	}
-				case tcell.KeyTab:
-
-				case tcell.KeyRune:
-					// if u.mode == ModeInsert {
-					// 	u.buffer += string(ev.Rune())
-					// 	continue
-					// }
-					switch ev.Rune() {
-					// case 'q':
-					// 	return nil
-					}
-				case tcell.KeyUp, tcell.KeyDown, tcell.KeyLeft, tcell.KeyRight:
-					//
 				}
 			}
 		}
 	}
-}
-
-func (u *UI) CreateUser(ctx context.Context, username openapi.Username) (*User, error) {
-	// Create user
-	user, err := NewUser(
-		username,
-		u.storage,
-		u.openapiClient,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("NewUser: %w", err)
-	}
-	// Register user on distant server, fail if already exists
-	err = user.Register(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("user.Register: %w", err)
-	}
-	return user, nil
 }
