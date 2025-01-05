@@ -33,34 +33,18 @@ func main() {
 		logger.Fatal("database.NewSQLite3DB", zap.Error(err))
 	}
 
-	ui, err := client.NewUI(config, db)
+	err = client.InitUI(config, db)
 	if err != nil {
 		logger.Fatal("NewUI", zap.Error(err))
 	}
-	defer ui.Quit()
+	defer client.UISingleton.Quit()
 
-	err = ui.Run(ctx)
+	err = client.UISingleton.Run(ctx)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			return
 		}
-		logger.Fatal("ui.Run", zap.Error(err))
+		logger.Fatal("client.UISingleton.Run", zap.Error(err))
 	}
+	logger.Info("client.UISingleton.Run", zap.String("reason", "context.Canceled"))
 }
-
-// err = alice.SendMessage(
-// 	ctx,
-// 	types.PlainText("hello, bob"),
-// 	openapi.Username("bob"),
-// )
-// if err != nil {
-// 	logger.Fatal("alice.SendMessage", zap.Error(err))
-// }
-
-// messages, err := bob.FetchMessages(ctx)
-// if err != nil {
-// 	logger.Fatal("bob.FetchMessages", zap.Error(err))
-// }
-// for _, message := range messages {
-// 	fmt.Printf("%s -> %s: %q\n", message.Sender, message.Recipient, string(message.Plaintext))
-// }

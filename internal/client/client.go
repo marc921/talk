@@ -2,9 +2,14 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
+
+	"github.com/gorilla/websocket"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/marc921/talk/internal/cryptography"
 	"github.com/marc921/talk/internal/types"
@@ -177,4 +182,86 @@ func (c *Client) GetMessages(
 	default:
 		return nil, fmt.Errorf("received unexpected status code: %d", resp.HTTPResponse.StatusCode)
 	}
+}
+
+func (c *Client) WebSocket(
+	ctx context.Context,
+	token string,
+	readChan chan<- *openapi.Message,
+	writeChan <-chan *openapi.Message,
+) error {
+	serverUrl, err := url.ParseRequestURI(UISingleton.config.Server.URL)
+	if err != nil {
+		return fmt.Errorf("url.ParseRequestURI: %w", err)
+	}
+	serverUrl.Scheme = "wss"
+	serverUrl.Path = fmt.Sprintf("%s/ws/%s", serverUrl.Path, string(c.username))
+
+	header := http.Header{}
+	header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	wsConn, _, err := websocket.DefaultDialer.DialContext(ctx, serverUrl.String(), header)
+	if err != nil {
+		return fmt.Errorf("websocket.DefaultDialer.Dial: %w", err)
+	}
+	defer wsConn.Close()
+
+	wsConn.SetReadLimit(1 << 20) // 1 MiB	// TODO: chunk messages, match size with server 512
+
+	errGrp, ctx := errgroup.WithContext(ctx)
+
+	errGrp.Go(func() error {
+		defer close(readChan)
+		for {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+				msgType, message, err := wsConn.ReadMessage()
+				if err != nil {
+					return fmt.Errorf("wsConn.ReadMessage: %w", err)
+				}
+				if msgType != websocket.TextMessage {
+					// TODO: handle ping/pong messages ?
+					return fmt.Errorf("unexpected message type: %d", msgType)
+				}
+				var msg *openapi.Message
+				err = json.Unmarshal(message, &msg)
+				if err != nil {
+					return fmt.Errorf("json.Unmarshal: %w", err)
+				}
+				readChan <- msg
+			}
+		}
+	})
+
+	errGrp.Go(func() error {
+		for {
+			select {
+			case <-ctx.Done():
+				err := wsConn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+				if err != nil {
+					return fmt.Errorf("wsConn.WriteMessage(Close): %w", err)
+				}
+				return ctx.Err()
+			case message, ok := <-writeChan:
+				if !ok {
+					return errors.New("writeChan closed")
+				}
+				msgBytes, err := json.Marshal(message)
+				if err != nil {
+					return fmt.Errorf("json.Marshal: %w", err)
+				}
+				err = wsConn.WriteMessage(websocket.TextMessage, msgBytes)
+				if err != nil {
+					return fmt.Errorf("wsConn.WriteMessage: %w", err)
+				}
+			}
+		}
+	})
+
+	err = errGrp.Wait()
+	if err != nil {
+		return fmt.Errorf("errGrp.Wait: %w", err)
+	}
+	return nil
 }

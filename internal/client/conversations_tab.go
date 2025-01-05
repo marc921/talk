@@ -36,7 +36,7 @@ func (c *ConversationsTab) Focus(focused bool) {
 	}
 	c.hasFocus = focused
 	if focused {
-		c.actions <- &ActionSetMode{mode: ModeNormal}
+		UISingleton.actions <- &ActionSetMode{mode: ModeNormal}
 	}
 }
 
@@ -46,12 +46,12 @@ func (c *ConversationsTab) OnEvent(event any) {
 		c.mode = event.mode
 	case *EventSelectUser:
 		c.localUser = event.user
-		c.actions <- &ActionFetchMessages{user: c.localUser}
+		UISingleton.actions <- &ActionFetchMessages{user: c.localUser}
 	case *EventUpdateUser:
 		c.localUser = event.user
 	case *EventSelectConversation:
 		c.selected = event.conversation.dbConv.RemoteUserName
-		c.actions <- &ActionSwitchTab{tabIndex: TabMessages}
+		UISingleton.actions <- &ActionSwitchTab{tabIndex: TabMessages}
 	case *EventFocus:
 		c.hasFocus = true
 	case *tcell.EventKey:
@@ -65,17 +65,17 @@ func (c *ConversationsTab) OnEvent(event any) {
 			c.hovered = min(c.hovered+1, len(c.localUser.conversations))
 		case tcell.KeyEnter:
 			if c.mode == ModeInsert {
-				c.actions <- &ActionCreateConversation{
+				UISingleton.actions <- &ActionCreateConversation{
 					localUser:      c.localUser,
 					remoteUsername: c.newConversationBuffer,
 				}
 				c.newConversationBuffer = ""
-				c.actions <- &ActionSetMode{mode: ModeNormal}
+				UISingleton.actions <- &ActionSetMode{mode: ModeNormal}
 			} else if c.hovered == len(c.localUser.conversations) {
-				c.actions <- &ActionSetMode{mode: ModeInsert}
+				UISingleton.actions <- &ActionSetMode{mode: ModeInsert}
 			} else {
 				remoteUsernames := c.GetSortedRemoteUsernames()
-				c.actions <- &ActionSelectConversation{
+				UISingleton.actions <- &ActionSelectConversation{
 					conversation: c.localUser.conversations[remoteUsernames[c.hovered]],
 				}
 			}

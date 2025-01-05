@@ -37,7 +37,7 @@ func (c *SeparatorLine) Render() {
 	} else if c.bounds.Height == 1 {
 		r = '─' // '─', U+2500, BOX DRAWINGS LIGHT HORIZONTAL
 	} else {
-		c.actions <- &ActionSetError{
+		UISingleton.actions <- &ActionSetError{
 			err: fmt.Errorf("invalid separator line dimensions: %v", c.bounds),
 		}
 	}

@@ -34,15 +34,13 @@ type BaseComponent struct {
 	screen     tcell.Screen
 	bounds     *Rect
 	drawCursor *Cursor
-	actions    chan<- Action
 }
 
-func NewBaseComponent(screen tcell.Screen, bounds *Rect, actions chan<- Action) *BaseComponent {
+func NewBaseComponent(screen tcell.Screen, bounds *Rect) *BaseComponent {
 	return &BaseComponent{
 		screen:     screen,
 		bounds:     bounds,
 		drawCursor: NewCursor(bounds),
-		actions:    actions,
 	}
 }
 

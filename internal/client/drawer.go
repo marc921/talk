@@ -1,6 +1,8 @@
 package client
 
 import (
+	"fmt"
+
 	"github.com/gdamore/tcell/v2"
 )
 
@@ -17,11 +19,18 @@ const (
 	TabUsers TabIndex = iota
 	TabConversations
 	TabMessages
-	
+
 	TabCount // Keep this last
 )
 
-func NewDrawer(screen tcell.Screen, actions chan<- Action) *Drawer {
+func NewDrawer() (*Drawer, error) {
+	screen, err := tcell.NewScreen()
+	if err != nil {
+		return nil, fmt.Errorf("tcell.NewScreen: %w", err)
+	}
+	if err := screen.Init(); err != nil {
+		return nil, fmt.Errorf("screen.Init: %w", err)
+	}
 	width, height := screen.Size()
 	leftSideWidth := 30
 	return &Drawer{
@@ -30,45 +39,37 @@ func NewDrawer(screen tcell.Screen, actions chan<- Action) *Drawer {
 			NewHeader(NewBaseComponent(
 				screen,
 				&Rect{Left: 0, Top: 0, Width: width, Height: 1},
-				actions,
 			)),
 			NewSeparatorLine(NewBaseComponent(
 				screen,
 				&Rect{Left: 0, Top: 1, Width: width, Height: 1},
-				actions,
 			)),
 			NewUsersTab(NewBaseComponent(
 				screen,
 				&Rect{Left: 0, Top: 2, Width: leftSideWidth, Height: 10},
-				actions,
 			)),
 			NewSeparatorLine(NewBaseComponent(
 				screen,
 				&Rect{Left: 0, Top: 12, Width: leftSideWidth, Height: 1},
-				actions,
 			)),
 			NewConversationsTab(NewBaseComponent(
 				screen,
 				&Rect{Left: 0, Top: 13, Width: leftSideWidth, Height: height - 13},
-				actions,
 			)),
 			NewSeparatorLine(NewBaseComponent(
 				screen,
 				&Rect{Left: leftSideWidth, Top: 2, Width: 1, Height: height - 2},
-				actions,
 			)),
 			NewMessagesTab(NewBaseComponent(
 				screen,
 				&Rect{Left: leftSideWidth + 1, Top: 2, Width: width - leftSideWidth - 1, Height: height - 2},
-				actions,
 			)),
 			NewErrorModal(NewBaseComponent(
 				screen,
 				&Rect{Left: 0, Top: 0, Width: width, Height: height},
-				actions,
 			)),
 		},
-	}
+	}, nil
 }
 
 func (d *Drawer) OnEvent(event any) {

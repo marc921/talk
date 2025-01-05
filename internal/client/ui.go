@@ -12,9 +12,10 @@ import (
 
 type UI struct {
 	drawer        *Drawer
-	actions       <-chan Action
+	actions       chan Action
 	db            *sql.DB
 	openapiClient *openapi.ClientWithResponses
+	config        *Config
 }
 
 type Mode string
@@ -24,33 +25,33 @@ const (
 	ModeInsert Mode = "Insert"
 )
 
-func NewUI(
+var UISingleton *UI
+
+func InitUI(
 	config *Config,
 	db *sql.DB,
-) (*UI, error) {
-	screen, err := tcell.NewScreen()
-	if err != nil {
-		return nil, fmt.Errorf("tcell.NewScreen: %w", err)
-	}
-	if err := screen.Init(); err != nil {
-		return nil, fmt.Errorf("screen.Init: %w", err)
-	}
-
+) error {
 	openapiClient, err := openapi.NewClientWithResponses(
 		config.Server.URL,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("openapi.NewClientWithResponses: %w", err)
+		return fmt.Errorf("openapi.NewClientWithResponses: %w", err)
 	}
 
-	actions := make(chan Action, 100)
-
-	return &UI{
-		drawer:        NewDrawer(screen, actions),
-		actions:       actions,
+	UISingleton = &UI{
+		actions:       make(chan Action, 100),
 		db:            db,
 		openapiClient: openapiClient,
-	}, nil
+		config:        config,
+	}
+
+	drawer, err := NewDrawer()
+	if err != nil {
+		return fmt.Errorf("NewDrawer: %w", err)
+	}
+	UISingleton.drawer = drawer
+
+	return nil
 }
 
 func (u *UI) Quit() {

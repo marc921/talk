@@ -1,10 +1,11 @@
 module github.com/marc921/talk
 
-go 1.22.2
+go 1.23
 
 require (
 	github.com/gdamore/tcell/v2 v2.7.4
 	github.com/golang-jwt/jwt/v5 v5.2.1
+	github.com/gorilla/websocket v1.5.3
 	github.com/labstack/echo-jwt/v4 v4.2.0
 	github.com/labstack/echo/v4 v4.12.0
 	github.com/mattn/go-sqlite3 v1.14.24
@@ -12,6 +13,7 @@ require (
 	github.com/sethvargo/go-envconfig v1.1.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.23.0
+	golang.org/x/sync v0.8.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 

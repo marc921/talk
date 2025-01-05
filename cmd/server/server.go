@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,6 +14,7 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/acme/autocert"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/marc921/talk/internal/server"
 )
@@ -40,14 +43,14 @@ func main() {
 		time.Hour,
 	)
 
-	controller := server.NewServerController(
-		logger.With(zap.String("component", "controller")),
-	)
+	controller := server.NewServerController(logger)
+	websocketHub := server.NewWebSocketHub(logger)
 
 	api := server.NewAPI(
-		logger.With(zap.String("component", "api")),
+		logger,
 		authenticator,
 		controller,
+		websocketHub,
 	)
 
 	// Echo instance
@@ -56,18 +59,7 @@ func main() {
 	e.AutoTLSManager.HostPolicy = autocert.HostWhitelist("marcbrun.eu")
 	e.AutoTLSManager.Cache = autocert.DirCache("/var/www/.cache")
 	e.Use(middleware.Logger())
-
-	go func() {
-		<-ctx.Done()
-		gracePeriod := time.Minute
-		logger.Info("shutting down echo server", zap.Duration("grace_period", gracePeriod))
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), gracePeriod)
-		defer cancel()
-		err := e.Shutdown(shutdownCtx)
-		if err != nil {
-			logger.Error("server shutdown", zap.Error(err))
-		}
-	}()
+	e.Debug = true
 
 	// Routes
 	v1 := e.Group("/api/v1")
@@ -82,8 +74,50 @@ func main() {
 	messages.POST("/:username", api.AddMessage)
 	messages.GET("/:username", api.GetMessages)
 
+	websocket := v1.Group("/ws")
+	websocket.Use(echojwt.JWT([]byte(config.AuthTokenSecretKey)))
+	websocket.GET("/:username", api.RegisterWebsocketClient)
+
 	// Start server
-	e.Logger.Fatal(e.StartAutoTLS(":443"))
+	errGrp, ctx := errgroup.WithContext(ctx)
+
+	errGrp.Go(func() error {
+		err := websocketHub.Run(ctx)
+		if err != nil {
+			return fmt.Errorf("websocketHub.Run: %w", err)
+		}
+		return nil
+	})
+
+	errGrp.Go(func() error {
+		err := e.StartAutoTLS(":443")
+		if err != nil {
+			return fmt.Errorf("e.StartAutoTLS: %w", err)
+		}
+		return nil
+	})
+
+	errGrp.Go(func() error {
+		<-ctx.Done()
+		gracePeriod := time.Minute
+		logger.Info("shutting down echo server", zap.Duration("grace_period", gracePeriod))
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), gracePeriod)
+		defer cancel()
+		err := e.Shutdown(shutdownCtx)
+		if err != nil {
+			return fmt.Errorf("server shutdown: %w", err)
+		}
+		return nil
+	})
+
+	err = errGrp.Wait()
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			logger.Info("shutting down")
+			return
+		}
+		logger.Fatal("errGrp.Wait", zap.Error(err))
+	}
 }
 
 func OnSignal(f func(), logger *zap.Logger) {

@@ -16,17 +16,20 @@ type API struct {
 	logger        *zap.Logger
 	Authenticator *Authenticator
 	Controller    *ServerController
+	WebsocketHub  *WebSocketHub
 }
 
 func NewAPI(
 	logger *zap.Logger,
 	authenticator *Authenticator,
 	controller *ServerController,
+	websocketHub *WebSocketHub,
 ) *API {
 	return &API{
-		logger:        logger,
+		logger:        logger.With(zap.String("component", "api")),
 		Authenticator: authenticator,
 		Controller:    controller,
+		WebsocketHub:  websocketHub,
 	}
 }
 
@@ -44,9 +47,8 @@ func (a *API) GetAuth(c echo.Context) error {
 func (a *API) PostAuth(c echo.Context) error {
 	var signedAuthChallenge *openapi.AuthChallengeSigned
 	if err := c.Bind(&signedAuthChallenge); err != nil {
-		return c.JSON(http.StatusBadRequest, openapi.ErrorResponse{
-			Error: fmt.Sprintf("invalid request: %v", err),
-		})
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request").
+			WithInternal(fmt.Errorf("c.Bind: %w", err))
 	}
 
 	username, err := a.Authenticator.VerifyAuthChallenge(signedAuthChallenge, a.Controller)
@@ -84,9 +86,8 @@ func (a *API) GetUser(c echo.Context) error {
 func (a *API) AddUser(c echo.Context) error {
 	var req *openapi.PublicUser
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, openapi.ErrorResponse{
-			Error: fmt.Sprintf("invalid request: %v", err),
-		})
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request").
+			WithInternal(fmt.Errorf("c.Bind: %w", err))
 	}
 
 	alreadyExists, err := a.Controller.AddUser(req.Name, req.PublicKey)
@@ -112,9 +113,8 @@ func (a *API) GetMessages(c echo.Context) error {
 
 	err := a.Authenticator.VerifyAuthJWT(c, username)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, openapi.ErrorResponse{
-			Error: fmt.Sprintf("unauthorized: %v", err),
-		})
+		return echo.NewHTTPError(http.StatusUnauthorized, "Unauthorized").
+			WithInternal(fmt.Errorf("Authenticator.VerifyAuthJWT: %w", err))
 	}
 
 	messages := a.Controller.GetMessages(username)
@@ -127,25 +127,40 @@ func (a *API) AddMessage(c echo.Context) error {
 
 	err := a.Authenticator.VerifyAuthJWT(c, username)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, openapi.ErrorResponse{
-			Error: fmt.Sprintf("unauthorized: %v", err),
-		})
+		return echo.NewHTTPError(http.StatusUnauthorized, "Unauthorized").
+			WithInternal(fmt.Errorf("Authenticator.VerifyAuthJWT: %w", err))
 	}
 
 	var message *openapi.Message
 	if err := c.Bind(&message); err != nil {
-		return c.JSON(http.StatusBadRequest, openapi.ErrorResponse{
-			Error: fmt.Sprintf("invalid request: %v", err),
-		})
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request").
+			WithInternal(fmt.Errorf("c.Bind: %w", err))
 	}
 
 	if username != message.Sender {
-		return c.JSON(http.StatusForbidden, openapi.ErrorResponse{
-			Error: "forbidden",
-		})
+		return echo.NewHTTPError(http.StatusForbidden, "Forbidden")
 	}
 
 	a.Controller.AddMessage(message)
 
 	return c.JSON(http.StatusCreated, nil)
+}
+
+// serveWs handles websocket requests from the peer.
+func (a *API) RegisterWebsocketClient(c echo.Context) error {
+	username := c.Param("username")
+
+	err := a.Authenticator.VerifyAuthJWT(c, username)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, "Unauthorized").
+			WithInternal(fmt.Errorf("Authenticator.VerifyAuthJWT: %w", err))
+	}
+
+	err = a.WebsocketHub.RegisterClient(c, username)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError).
+			WithInternal(fmt.Errorf("WebsocketHub.RegisterClient: %w", err))
+	}
+
+	return nil
 }

@@ -16,29 +16,29 @@ import (
 )
 
 type User struct {
-	name          openapi.Username
-	db            *sql.DB
-	key           *rsa.PrivateKey
-	client        *Client
-	authToken     *string
-	conversations map[openapi.Username]*Conversation
+	name             openapi.Username
+	key              *rsa.PrivateKey
+	client           *Client
+	authToken        *string
+	conversations    map[openapi.Username]*Conversation
+	inboundMessages  chan *openapi.Message
+	outboundMessages chan *openapi.Message
 }
 
 func NewUser(
 	localUser *sqlcgen.LocalUser,
-	db *sql.DB,
-	openapiClient *openapi.ClientWithResponses,
 ) (*User, error) {
 	privKey, err := cryptography.UnmarshalPrivateKey(localUser.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("cryptography.UnmarshalPrivateKey: %w", err)
 	}
 	user := &User{
-		name:          localUser.Name,
-		db:            db,
-		key:           privKey,
-		client:        NewClient(openapiClient, localUser.Name),
-		conversations: make(map[openapi.Username]*Conversation),
+		name:             localUser.Name,
+		key:              privKey,
+		client:           NewClient(UISingleton.openapiClient, localUser.Name),
+		conversations:    make(map[openapi.Username]*Conversation),
+		inboundMessages:  make(chan *openapi.Message),
+		outboundMessages: make(chan *openapi.Message),
 	}
 	return user, nil
 }
@@ -70,8 +70,35 @@ func (u *User) Authenticate(ctx context.Context) error {
 	return nil
 }
 
+func (u *User) RegisterWebSocket(ctx context.Context) error {
+	if u.authToken == nil {
+		err := u.Authenticate(ctx)
+		if err != nil {
+			return fmt.Errorf("Authenticate: %w", err)
+		}
+	}
+	go func() {
+		err := u.client.WebSocket(ctx, *u.authToken, u.inboundMessages, u.outboundMessages)
+		if err != nil {
+			UISingleton.actions <- &ActionSetError{err: fmt.Errorf("client.WebSocket: %w", err)}
+		}
+	}()
+
+	go func() {
+		queries := sqlcgen.New(UISingleton.db)
+		for message := range u.inboundMessages {
+			err := u.receiveMessage(ctx, queries, *message)
+			if err != nil {
+				UISingleton.actions <- &ActionSetError{err: fmt.Errorf("receiveMessage: %w", err)}
+			}
+			UISingleton.drawer.Draw()
+		}
+	}()
+	return nil
+}
+
 func (u *User) GetPublicUser(ctx context.Context, name openapi.Username) (*types.PublicUser, error) {
-	queries := sqlcgen.New(u.db)
+	queries := sqlcgen.New(UISingleton.db)
 	// Check if the public user is already in the database
 	publicUser, err := queries.GetPublicUserByName(ctx, name)
 	if err != nil {
@@ -105,7 +132,7 @@ func (u *User) GetPublicUser(ctx context.Context, name openapi.Username) (*types
 // ListConversations fetches the conversations from the database along with their messages
 // and stores them in the user's local cache
 func (u *User) FetchConversationsFromDB(ctx context.Context) error {
-	queries := sqlcgen.New(u.db)
+	queries := sqlcgen.New(UISingleton.db)
 	dbConvs, err := queries.ListConversations(ctx, u.name)
 	if err != nil {
 		return fmt.Errorf("queries.ListConversations: %w", err)
@@ -123,7 +150,7 @@ func (u *User) FetchConversationsFromDB(ctx context.Context) error {
 }
 
 func (u *User) CreateConversation(ctx context.Context, remoteUsername openapi.Username) error {
-	queries := sqlcgen.New(u.db)
+	queries := sqlcgen.New(UISingleton.db)
 	dbConv, err := queries.InsertConversation(ctx, sqlcgen.InsertConversationParams{
 		LocalUserName:  u.name,
 		RemoteUserName: remoteUsername,
@@ -141,29 +168,9 @@ func (u *User) SendMessage(ctx context.Context, plaintext types.PlainText, recip
 		return fmt.Errorf("conversation not found")
 	}
 
-	recipient, err := u.GetPublicUser(ctx, recipientName)
+	encryptedMsg, err := u.encryptMessage(ctx, plaintext, recipientName)
 	if err != nil {
-		return fmt.Errorf("GetPublicUser: %w", err)
-	}
-
-	// Encrypt plaintext with new unique symmetric key
-	symKey, err := cryptography.GenerateAESKey()
-	if err != nil {
-		return fmt.Errorf("cryptography.GenerateAESKey: %w", err)
-	}
-	cipher, err := cryptography.NewAESCipher(symKey)
-	if err != nil {
-		return fmt.Errorf("cryptography.NewAESCipher: %w", err)
-	}
-	ciphertext, err := cipher.Encrypt(plaintext)
-	if err != nil {
-		return fmt.Errorf("cipher.Encrypt: %w", err)
-	}
-
-	// Encrypt symmetric key with recipient's public key
-	cipheredSymKey, err := rsa.EncryptPKCS1v15(rand.Reader, recipient.PublicKey, symKey)
-	if err != nil {
-		return fmt.Errorf("rsa.EncryptPKCS1v15: %w", err)
+		return fmt.Errorf("encryptMessage: %w", err)
 	}
 
 	if u.authToken == nil {
@@ -174,12 +181,12 @@ func (u *User) SendMessage(ctx context.Context, plaintext types.PlainText, recip
 	}
 
 	// Start transaction to insert message in database and send it to remote user, rollback if any error occurs
-	tx, err := u.db.Begin()
+	tx, err := UISingleton.db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	txQueries := sqlcgen.New(u.db).WithTx(tx)
+	txQueries := sqlcgen.New(UISingleton.db).WithTx(tx)
 
 	// Insert message in database
 	dbMessage, err := txQueries.InsertMessage(ctx, sqlcgen.InsertMessageParams{
@@ -196,15 +203,11 @@ func (u *User) SendMessage(ctx context.Context, plaintext types.PlainText, recip
 	conversation.messages = append(conversation.messages, dbMessage)
 
 	// Send message to remote user
-	err = u.client.SendMessage(ctx, *u.authToken, &openapi.Message{
-		Sender:       u.name,
-		Recipient:    recipientName,
-		CipherSymKey: cipheredSymKey,
-		Ciphertext:   ciphertext,
-	})
-	if err != nil {
-		return fmt.Errorf("client.SendMessage: %w", err)
-	}
+	// err = u.client.SendMessage(ctx, *u.authToken, encryptedMsg)
+	// if err != nil {
+	// 	return fmt.Errorf("client.SendMessage: %w", err)
+	// }
+	u.outboundMessages <- encryptedMsg
 
 	// Commit transaction
 	err = tx.Commit()
@@ -235,46 +238,106 @@ func (u *User) FetchMessages(ctx context.Context) error {
 		return fmt.Errorf("client.GetMessages: %w", err)
 	}
 
-	queries := sqlcgen.New(u.db)
+	queries := sqlcgen.New(UISingleton.db)
 	for _, message := range messages {
-		conv, ok := u.conversations[message.Sender]
-		if !ok {
-			err = u.CreateConversation(ctx, message.Sender)
-			if err != nil {
-				return fmt.Errorf("CreateConversation: %w", err)
-			}
-			conv = u.conversations[message.Sender]
-		}
-		// TODO: sign and verify messages
-		// sender, err := u.GetPublicUser(ctx, message.Sender)
-		// if err != nil {
-		// 	return fmt.Errorf("GetPublicUser: %w", err)
-		// }
-		// Decrypt symmetric key with private key
-		symKey, err := rsa.DecryptPKCS1v15(rand.Reader, u.key, message.CipherSymKey)
+		err := u.receiveMessage(ctx, queries, message)
 		if err != nil {
-			return fmt.Errorf("rsa.DecryptPKCS1v15: %w", err)
+			return fmt.Errorf("receiveMessage: %w", err)
 		}
-		cipher, err := cryptography.NewAESCipher(symKey)
-		if err != nil {
-			return fmt.Errorf("cryptography.NewAESCipher: %w", err)
-		}
-		plaintext, err := cipher.Decrypt(message.Ciphertext)
-		if err != nil {
-			return fmt.Errorf("cipher.Decrypt: %w", err)
-		}
-		// Insert message in database
-		dbMessage, err := queries.InsertMessage(ctx, sqlcgen.InsertMessageParams{
-			ConversationID: conv.dbConv.ID,
-			Sender:         message.Sender,
-			Receiver:       message.Recipient,
-			Content:        plaintext,
-		})
-		if err != nil {
-			return fmt.Errorf("queries.InsertMessage: %w", err)
-		}
-		conv.messages = append(conv.messages, dbMessage)
-
 	}
 	return nil
+}
+
+func (u *User) receiveMessage(
+	ctx context.Context,
+	queries *sqlcgen.Queries,
+	message openapi.Message,
+) error {
+	conv, ok := u.conversations[message.Sender]
+	if !ok {
+		err := u.CreateConversation(ctx, message.Sender)
+		if err != nil {
+			return fmt.Errorf("CreateConversation: %w", err)
+		}
+		conv = u.conversations[message.Sender]
+	}
+
+	decryptedMsg, err := u.decryptMessage(message)
+	if err != nil {
+		return fmt.Errorf("decryptMessage: %w", err)
+	}
+	decryptedMsg.ConversationID = conv.dbConv.ID
+
+	// Insert message in database
+	dbMessage, err := queries.InsertMessage(ctx, *decryptedMsg)
+	if err != nil {
+		return fmt.Errorf("queries.InsertMessage: %w", err)
+	}
+	conv.messages = append(conv.messages, dbMessage)
+	return nil
+}
+
+func (u *User) decryptMessage(message openapi.Message) (*sqlcgen.InsertMessageParams, error) {
+	// TODO: sign and verify messages
+	// sender, err := u.GetPublicUser(ctx, message.Sender)
+	// if err != nil {
+	// 	return fmt.Errorf("GetPublicUser: %w", err)
+	// }
+	// Decrypt symmetric key with private key
+	symKey, err := rsa.DecryptPKCS1v15(rand.Reader, u.key, message.CipherSymKey)
+	if err != nil {
+		return nil, fmt.Errorf("rsa.DecryptPKCS1v15: %w", err)
+	}
+	cipher, err := cryptography.NewAESCipher(symKey)
+	if err != nil {
+		return nil, fmt.Errorf("cryptography.NewAESCipher: %w", err)
+	}
+	plaintext, err := cipher.Decrypt(message.Ciphertext)
+	if err != nil {
+		return nil, fmt.Errorf("cipher.Decrypt: %w", err)
+	}
+
+	return &sqlcgen.InsertMessageParams{
+		Sender:   message.Sender,
+		Receiver: message.Recipient,
+		Content:  plaintext,
+	}, nil
+}
+
+func (u *User) encryptMessage(
+	ctx context.Context,
+	plaintext types.PlainText,
+	recipientName openapi.Username,
+) (*openapi.Message, error) {
+	recipient, err := u.GetPublicUser(ctx, recipientName)
+	if err != nil {
+		return nil, fmt.Errorf("GetPublicUser: %w", err)
+	}
+
+	// Encrypt plaintext with new unique symmetric key
+	symKey, err := cryptography.GenerateAESKey()
+	if err != nil {
+		return nil, fmt.Errorf("cryptography.GenerateAESKey: %w", err)
+	}
+	cipher, err := cryptography.NewAESCipher(symKey)
+	if err != nil {
+		return nil, fmt.Errorf("cryptography.NewAESCipher: %w", err)
+	}
+	ciphertext, err := cipher.Encrypt(plaintext)
+	if err != nil {
+		return nil, fmt.Errorf("cipher.Encrypt: %w", err)
+	}
+
+	// Encrypt symmetric key with recipient's public key
+	cipheredSymKey, err := rsa.EncryptPKCS1v15(rand.Reader, recipient.PublicKey, symKey)
+	if err != nil {
+		return nil, fmt.Errorf("rsa.EncryptPKCS1v15: %w", err)
+	}
+
+	return &openapi.Message{
+		Sender:       u.name,
+		Recipient:    recipientName,
+		CipherSymKey: cipheredSymKey,
+		Ciphertext:   ciphertext,
+	}, nil
 }

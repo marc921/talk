@@ -26,7 +26,11 @@ func (q *Queries) GetConversation(ctx context.Context, arg GetConversationParams
 }
 
 const insertConversation = `-- name: InsertConversation :one
-INSERT INTO conversations (local_user_name, remote_user_name) VALUES (?, ?) RETURNING id, local_user_name, remote_user_name
+INSERT INTO conversations (local_user_name, remote_user_name) 
+VALUES (?, ?) 
+ON CONFLICT (local_user_name, remote_user_name) 
+DO UPDATE SET local_user_name = EXCLUDED.local_user_name
+RETURNING id, local_user_name, remote_user_name
 `
 
 type InsertConversationParams struct {

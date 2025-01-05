@@ -19,7 +19,7 @@ type ServerController struct {
 
 func NewServerController(logger *zap.Logger) *ServerController {
 	return &ServerController{
-		logger:          logger,
+		logger:          logger.With(zap.String("component", "controller")),
 		usersPublicKeys: make(map[openapi.Username]*rsa.PublicKey),
 		inboxes:         make(map[openapi.Username][]*openapi.Message),
 	}

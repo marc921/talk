@@ -28,6 +28,16 @@ func (a *ActionQuit) String() string {
 	return "Quit"
 }
 
+type ActionZero struct{}
+
+func (a *ActionZero) Do(ctx context.Context, u *UI) error {
+	return nil
+}
+
+func (a *ActionZero) String() string {
+	return "Zero"
+}
+
 type ActionSetError struct {
 	err error
 }
@@ -65,9 +75,13 @@ func (a *ActionListUsers) Do(ctx context.Context, u *UI) error {
 	users := make([]*User, 0, len(localUsers))
 	for _, localUser := range localUsers {
 		localUser := localUser
-		user, err := NewUser(localUser, u.db, u.openapiClient)
+		user, err := NewUser(localUser)
 		if err != nil {
 			return fmt.Errorf("NewUser: %w", err)
+		}
+		err = user.RegisterWebSocket(ctx)
+		if err != nil {
+			return fmt.Errorf("user.RegisterWebSocket: %w", err)
 		}
 		users = append(users, user)
 	}
@@ -119,7 +133,7 @@ func (a *ActionCreateUser) Do(ctx context.Context, u *UI) error {
 		return fmt.Errorf("queries.InsertLocalUser: %w", err)
 	}
 
-	user, err := NewUser(localUser, u.db, u.openapiClient)
+	user, err := NewUser(localUser)
 	if err != nil {
 		return fmt.Errorf("NewUser: %w", err)
 	}
@@ -134,6 +148,11 @@ func (a *ActionCreateUser) Do(ctx context.Context, u *UI) error {
 	err = tx.Commit()
 	if err != nil {
 		return fmt.Errorf("tx.Commit: %w", err)
+	}
+
+	err = user.RegisterWebSocket(ctx)
+	if err != nil {
+		return fmt.Errorf("user.RegisterWebSocket: %w", err)
 	}
 
 	u.drawer.OnEvent(&EventNewUser{user: user})

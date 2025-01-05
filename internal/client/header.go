@@ -35,7 +35,7 @@ func (c *Header) OnEvent(event any) {
 	case *tcell.EventKey:
 		switch event.Key() {
 		case tcell.KeyEscape:
-			c.actions <- &ActionSetMode{mode: ModeNormal}
+			UISingleton.actions <- &ActionSetMode{mode: ModeNormal}
 		case tcell.KeyRune:
 			if c.mode == ModeInsert {
 				// Insert mode does not affect the header
@@ -43,7 +43,7 @@ func (c *Header) OnEvent(event any) {
 			}
 			switch event.Rune() {
 			case 'q':
-				c.actions <- new(ActionQuit)
+				UISingleton.actions <- new(ActionQuit)
 			}
 		}
 	}

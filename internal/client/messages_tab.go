@@ -30,7 +30,7 @@ func (c *MessagesTab) Focus(focused bool) {
 	}
 	c.hasFocus = focused
 	if focused {
-		c.actions <- &ActionSetMode{mode: ModeInsert}
+		UISingleton.actions <- &ActionSetMode{mode: ModeInsert}
 	}
 }
 
@@ -52,7 +52,7 @@ func (c *MessagesTab) OnEvent(event any) {
 		switch event.Key() {
 		case tcell.KeyEnter:
 			if c.mode == ModeInsert {
-				c.actions <- &ActionSendMessage{
+				UISingleton.actions <- &ActionSendMessage{
 					localUser:      c.localUser,
 					remoteUsername: c.conversation.dbConv.RemoteUserName,
 					plaintext:      []byte(c.newMessageBuffer),

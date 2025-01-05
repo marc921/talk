@@ -35,7 +35,7 @@ func (c *ErrorModal) OnEvent(event any) {
 		}
 		switch event.Key() {
 		case tcell.KeyEnter, tcell.KeyEscape:
-			c.actions <- &ActionSetError{err: nil}
+			UISingleton.actions <- &ActionSetError{err: nil}
 		}
 	}
 }

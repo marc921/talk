@@ -22,7 +22,10 @@ func NewUsersTab(base *BaseComponent) *UsersTab {
 		selected:      -1,
 		mode:          ModeNormal,
 	}
-	c.actions <- new(ActionListUsers)
+	if UISingleton == nil {
+		panic("UISingleton is nil")
+	}
+	UISingleton.actions <- new(ActionListUsers)
 	return c
 }
 
@@ -36,7 +39,7 @@ func (c *UsersTab) Focus(focused bool) {
 	}
 	c.hasFocus = focused
 	if focused {
-		c.actions <- &ActionSetMode{mode: ModeNormal}
+		UISingleton.actions <- &ActionSetMode{mode: ModeNormal}
 	}
 }
 
@@ -48,7 +51,7 @@ func (c *UsersTab) OnEvent(event any) {
 		c.users = event.users
 	case *EventNewUser:
 		c.users = append(c.users, event.user)
-		c.actions <- &ActionSelectUser{user: event.user}
+		UISingleton.actions <- &ActionSelectUser{user: event.user}
 	case *EventSelectUser:
 		for i, user := range c.users {
 			if user.name == event.user.name {
@@ -56,7 +59,7 @@ func (c *UsersTab) OnEvent(event any) {
 				break
 			}
 		}
-		c.actions <- &ActionSwitchTab{tabIndex: TabConversations}
+		UISingleton.actions <- &ActionSwitchTab{tabIndex: TabConversations}
 	case *EventFocus:
 		c.hasFocus = true
 	case *tcell.EventKey:
@@ -70,13 +73,13 @@ func (c *UsersTab) OnEvent(event any) {
 			c.hovered = min(c.hovered+1, len(c.users))
 		case tcell.KeyEnter:
 			if c.mode == ModeInsert {
-				c.actions <- &ActionCreateUser{username: c.newUsernameBuffer}
+				UISingleton.actions <- &ActionCreateUser{username: c.newUsernameBuffer}
 				c.newUsernameBuffer = ""
-				c.actions <- &ActionSetMode{mode: ModeNormal}
+				UISingleton.actions <- &ActionSetMode{mode: ModeNormal}
 			} else if c.hovered == len(c.users) {
-				c.actions <- &ActionSetMode{mode: ModeInsert}
+				UISingleton.actions <- &ActionSetMode{mode: ModeInsert}
 			} else {
-				c.actions <- &ActionSelectUser{user: c.users[c.hovered]}
+				UISingleton.actions <- &ActionSelectUser{user: c.users[c.hovered]}
 			}
 		case tcell.KeyBackspace, tcell.KeyBackspace2:
 			if c.mode == ModeInsert && len(c.newUsernameBuffer) > 0 {
