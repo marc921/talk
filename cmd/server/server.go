@@ -17,6 +17,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/marc921/talk/internal/server"
+	"github.com/marc921/talk/internal/server/render"
 )
 
 func main() {
@@ -67,6 +68,14 @@ func main() {
 	})
 
 	// Routes
+	e.GET("/", func(c echo.Context) error {
+		// We can get user data from the context, session, etc
+		user := "Developer"
+
+		// Render the templ component directly to the response writer
+		return render.Page(user).Render(c.Request().Context(), c.Response().Writer)
+	})
+
 	v1 := e.Group("/api/v1")
 	v1.GET("/auth/:username", api.GetAuth)
 	v1.POST("/auth/:username", api.PostAuth)

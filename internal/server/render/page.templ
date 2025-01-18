@@ -1,0 +1,53 @@
+package render
+
+templ Page(username string) {
+    <!DOCTYPE html>
+    <html lang="en">
+        <head>
+            <meta charset="UTF-8"/>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+            <title>My Templ Page</title>
+            <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+            <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"/>
+        </head>
+        <body class="bg-gray-100">
+            <div class="container mx-auto px-4 py-8">
+                @header()
+                @greeting(username)
+                @counter()
+            </div>
+        </body>
+    </html>
+}
+
+templ header() {
+    <header class="bg-white shadow rounded-lg mb-8 p-6">
+        <h1 class="text-3xl font-bold text-gray-900">Welcome to Templ</h1>
+        <p class="text-gray-600">A type-safe template engine for Go</p>
+    </header>
+}
+
+templ greeting(username string) {
+    <div class="bg-white shadow rounded-lg mb-8 p-6">
+        <h2 class="text-xl font-semibold">Hello, { username }!</h2>
+    </div>
+}
+
+templ counter() {
+    <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-xl font-semibold mb-4">Counter Example</h2>
+        <div id="counter" class="text-2xl mb-4">0</div>
+        <button 
+            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+            onclick="incrementCounter()"
+        >
+            Increment
+        </button>
+    </div>
+    <script>
+        function incrementCounter() {
+            const counter = document.getElementById('counter');
+            counter.textContent = parseInt(counter.textContent) + 1;
+        }
+    </script>
+}
