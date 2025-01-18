@@ -60,6 +60,9 @@ func (b *BaseComponent) PrintText(text string) {
 }
 
 func (b *BaseComponent) PrintTextStyle(text string, style tcell.Style) {
+	if b.drawCursor.IsOutOfBounds() {
+		return
+	}
 	for _, ch := range text {
 		b.screen.SetContent(b.drawCursor.X, b.drawCursor.Y, ch, nil, style)
 		b.drawCursor.X++
@@ -119,4 +122,11 @@ func (p *Cursor) Newline() {
 func (p *Cursor) MoveTo(x, y int) {
 	p.X = x
 	p.Y = y
+}
+
+func (p *Cursor) IsOutOfBounds() bool {
+	return p.X < p.bounds.Left ||
+		p.X >= p.bounds.Left+p.bounds.Width ||
+		p.Y < p.bounds.Top ||
+		p.Y >= p.bounds.Top+p.bounds.Height
 }

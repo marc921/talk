@@ -61,6 +61,11 @@ func main() {
 	e.Use(middleware.Logger())
 	e.Debug = true
 
+	// Client
+	e.GET("/client", func(c echo.Context) error {
+		return c.File("./public/talkclient")
+	})
+
 	// Routes
 	v1 := e.Group("/api/v1")
 	v1.GET("/auth/:username", api.GetAuth)

@@ -76,6 +76,8 @@ func (c *MessagesTab) Render() {
 		return
 	}
 	c.drawCursor.Reset()
+	// Scroll effect (2 lines for "Messages" and " + New")
+	c.drawCursor.Y += c.bounds.Height - len(c.conversation.messages) - 2
 	style := tcell.StyleDefault.Bold(true).Underline(true)
 	if c.hasFocus {
 		style = style.Foreground(tcell.ColorDeepSkyBlue)

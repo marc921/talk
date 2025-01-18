@@ -7,4 +7,4 @@ Talk is a simple messaging / data transfer service between clients, linked by a 
 - CI: run unit tests
 - CI: automatic deploy on marcbrun.eu
 - client: add cleanup sub-command
-- messages: create and maintain websockets
+- allow sending files

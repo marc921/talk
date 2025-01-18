@@ -94,13 +94,13 @@ type args struct {
 // getArgs parses and returns the command line arguments and/or relevant env vars
 func getArgs() args {
 	var homeDir string
-	flag.StringVar(&homeDir, "home", "", "path to the talk home directory (defaults to $TALK_HOME, then $HOME/.config/.talk)")
+	flag.StringVar(&homeDir, "home", "", "path to the talk home directory (defaults to $TALK_HOME, then $HOME/.config/talk)")
 	flag.Parse()
 	if homeDir == "" {
 		homeDir = os.Getenv("TALK_HOME")
 	}
 	if homeDir == "" {
-		homeDir = path.Join(os.Getenv("HOME"), ".config", ".talk")
+		homeDir = path.Join(os.Getenv("HOME"), ".config", "talk")
 	}
 	// Expand any user-supplied env vars
 	homeDir = os.ExpandEnv(homeDir)
