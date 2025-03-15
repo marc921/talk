@@ -12,6 +12,8 @@ type Config struct {
 	AuthChallengeSecretKey []byte `env:"AUTH_CHALLENGE_SECRET_KEY, required"`
 	// Used to sign the auth tokens
 	AuthTokenSecretKey []byte `env:"AUTH_TOKEN_SECRET_KEY, required"`
+	TLS                bool   `env:"TLS, default=true"`
+	DatabaseURL        string `env:"DATABASE_URL, required"`
 }
 
 func LoadConfig(ctx context.Context) (*Config, error) {

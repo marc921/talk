@@ -37,9 +37,8 @@ func (a *API) GetAuth(c echo.Context) error {
 	username := c.Param("username")
 	challenge, err := a.Authenticator.GenerateAuthChallenge(openapi.Username(username))
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, openapi.ErrorResponse{
-			Error: fmt.Sprintf("GenerateAuthChallenge: %v", err),
-		})
+		return echo.NewHTTPError(http.StatusInternalServerError, "GenerateAuthChallenge").
+			WithInternal(fmt.Errorf("Authenticator.GenerateAuthChallenge: %w", err))
 	}
 	return c.JSON(http.StatusOK, challenge)
 }
@@ -51,12 +50,15 @@ func (a *API) PostAuth(c echo.Context) error {
 			WithInternal(fmt.Errorf("c.Bind: %w", err))
 	}
 
-	username, err := a.Authenticator.VerifyAuthChallenge(signedAuthChallenge, a.Controller)
+	username, err := a.Authenticator.VerifyAuthChallenge(
+		c.Request().Context(),
+		signedAuthChallenge,
+		a.Controller,
+	)
 	if err != nil {
 		a.logger.Warn("VerifyAuthChallenge", zap.Error(err))
-		return c.JSON(http.StatusUnauthorized, openapi.ErrorResponse{
-			Error: "unauthorized",
-		})
+		return echo.NewHTTPError(http.StatusUnauthorized, "Unauthorized").
+			WithInternal(fmt.Errorf("Authenticator.VerifyAuthChallenge: %w", err))
 	}
 
 	authToken, err := a.Authenticator.GenerateAuthJWT(username)
@@ -68,11 +70,19 @@ func (a *API) PostAuth(c echo.Context) error {
 func (a *API) GetUser(c echo.Context) error {
 	username := c.Param("username")
 
-	publicKey, found := a.Controller.GetUserPublicKey(username)
-	if !found {
-		return c.JSON(http.StatusNotFound, openapi.ErrorResponse{
-			Error: "user not found",
-		})
+	publicKey, err := a.Controller.GetUserPublicKey(
+		c.Request().Context(),
+		username,
+	)
+	if err != nil {
+		if errors.Is(err, types.ErrNotFound) {
+			return echo.NewHTTPError(http.StatusNotFound, openapi.ErrorResponse{
+				Error: "user not found",
+			}).
+				WithInternal(fmt.Errorf("Controller.GetUserPublicKey: %w", err))
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get user").
+			WithInternal(fmt.Errorf("Controller.GetUserPublicKey: %w", err))
 	}
 
 	publicKeyPem := cryptography.MarshalPublicKey(publicKey)
@@ -90,16 +100,18 @@ func (a *API) AddUser(c echo.Context) error {
 			WithInternal(fmt.Errorf("c.Bind: %w", err))
 	}
 
-	alreadyExists, err := a.Controller.AddUser(req.Name, req.PublicKey)
+	alreadyExists, err := a.Controller.AddUser(
+		c.Request().Context(),
+		req.Name,
+		req.PublicKey,
+	)
 	if err != nil {
 		if errors.Is(err, types.ErrUserAlreadyExists) {
-			return c.JSON(http.StatusConflict, openapi.ErrorResponse{
-				Error: types.ErrUserAlreadyExists.Error(),
-			})
+			return echo.NewHTTPError(http.StatusConflict, types.ErrUserAlreadyExists.Error()).
+				WithInternal(fmt.Errorf("Controller.AddUser: %w", err))
 		}
-		return c.JSON(http.StatusInternalServerError, openapi.ErrorResponse{
-			Error: err.Error(),
-		})
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to add user").
+			WithInternal(fmt.Errorf("Controller.AddUser: %w", err))
 	}
 	if alreadyExists {
 		return c.JSON(http.StatusOK, nil)
@@ -117,7 +129,14 @@ func (a *API) GetMessages(c echo.Context) error {
 			WithInternal(fmt.Errorf("Authenticator.VerifyAuthJWT: %w", err))
 	}
 
-	messages := a.Controller.GetMessages(username)
+	messages, err := a.Controller.GetMessages(
+		c.Request().Context(),
+		username,
+	)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "could not get messages").
+			WithInternal(fmt.Errorf("Controller.GetMessages: %w", err))
+	}
 
 	return c.JSON(http.StatusOK, messages)
 }
@@ -141,7 +160,14 @@ func (a *API) AddMessage(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusForbidden, "Forbidden")
 	}
 
-	a.Controller.AddMessage(message)
+	err = a.Controller.AddMessage(
+		c.Request().Context(),
+		message,
+	)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "could not add message").
+			WithInternal(fmt.Errorf("Controller.AddMessage: %w", err))
+	}
 
 	return c.JSON(http.StatusCreated, nil)
 }

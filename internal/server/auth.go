@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/base64"
@@ -77,6 +78,7 @@ func (a *Authenticator) GenerateAuthChallenge(username openapi.Username) (*opena
 }
 
 func (a *Authenticator) VerifyAuthChallenge(
+	ctx context.Context,
 	signedAuthChallenge *openapi.AuthChallengeSigned,
 	controller *ServerController,
 ) (openapi.Username, error) {
@@ -113,9 +115,12 @@ func (a *Authenticator) VerifyAuthChallenge(
 	if !ok {
 		return "", fmt.Errorf("missing subject")
 	}
-	publicKey, found := controller.GetUserPublicKey(openapi.Username(username))
-	if !found {
-		return "", fmt.Errorf("user not found")
+	publicKey, err := controller.GetUserPublicKey(
+		ctx,
+		openapi.Username(username),
+	)
+	if err != nil {
+		return "", fmt.Errorf("controller.GetUserPublicKey: %w", err)
 	}
 
 	nonceBytes, err := base64.URLEncoding.DecodeString(nonce)

@@ -6,11 +6,15 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
 func NewSQLite3DB(dbPath string) (*sql.DB, error) {
+	if strings.HasPrefix(dbPath, "sqlite3:") {
+		dbPath = strings.TrimPrefix(dbPath, "sqlite3:")
+	}
 	// Check if the database file exists
 	_, err := os.Stat(dbPath)
 	if os.IsNotExist(err) {

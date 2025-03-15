@@ -2,13 +2,17 @@ package main
 
 import (
 	"context"
+	"embed"
 	"errors"
 	"fmt"
+	"io/fs"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/a-h/templ"
 	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -17,8 +21,12 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/marc921/talk/internal/server"
+	"github.com/marc921/talk/internal/server/database"
 	"github.com/marc921/talk/internal/server/render"
 )
+
+//go:embed static
+var staticFiles embed.FS
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -36,6 +44,11 @@ func main() {
 		logger.Fatal("LoadConfig", zap.Error(err))
 	}
 
+	db, err := database.NewSQLite3DB(config.DatabaseURL)
+	if err != nil {
+		logger.Fatal("database.NewSQLite3DB", zap.Error(err))
+	}
+
 	authenticator := server.NewAuthenticator(
 		config.AuthChallengeSecretKey,
 		config.AuthTokenSecretKey,
@@ -44,7 +57,7 @@ func main() {
 		time.Hour,
 	)
 
-	controller := server.NewServerController(logger)
+	controller := server.NewServerController(logger, db)
 	websocketHub := server.NewWebSocketHub(logger)
 
 	api := server.NewAPI(
@@ -57,8 +70,10 @@ func main() {
 	// Echo instance
 	e := echo.New()
 
-	e.AutoTLSManager.HostPolicy = autocert.HostWhitelist("marcbrun.eu")
-	e.AutoTLSManager.Cache = autocert.DirCache("/var/www/.cache")
+	if config.TLS {
+		e.AutoTLSManager.HostPolicy = autocert.HostWhitelist("marcbrun.eu")
+		e.AutoTLSManager.Cache = autocert.DirCache("/var/www/.cache")
+	}
 	e.Use(middleware.Logger())
 	e.Debug = true
 
@@ -67,15 +82,18 @@ func main() {
 		return c.File("./public/talkclient")
 	})
 
-	// Routes
+	// Front-end
 	e.GET("/", func(c echo.Context) error {
-		// We can get user data from the context, session, etc
-		user := "Developer"
-
-		// Render the templ component directly to the response writer
-		return render.Page(user).Render(c.Request().Context(), c.Response().Writer)
+		return Render(c, http.StatusOK, render.Page("world"))
 	})
 
+	fsys, err := fs.Sub(staticFiles, "static")
+	if err != nil {
+		logger.Fatal("fs.Sub", zap.Error(err))
+	}
+	e.GET("/static/*", echo.WrapHandler(http.StripPrefix("/static/", http.FileServer(http.FS(fsys)))))
+
+	// API
 	v1 := e.Group("/api/v1")
 	v1.GET("/auth/:username", api.GetAuth)
 	v1.POST("/auth/:username", api.PostAuth)
@@ -104,9 +122,16 @@ func main() {
 	})
 
 	errGrp.Go(func() error {
-		err := e.StartAutoTLS(":443")
-		if err != nil {
-			return fmt.Errorf("e.StartAutoTLS: %w", err)
+		if config.TLS {
+			err := e.StartAutoTLS(":443")
+			if err != nil {
+				return fmt.Errorf("e.StartAutoTLS: %w", err)
+			}
+		} else {
+			err := e.Start("localhost:8080")
+			if err != nil {
+				return fmt.Errorf("e.Start: %w", err)
+			}
 		}
 		return nil
 	})
@@ -140,4 +165,16 @@ func OnSignal(f func(), logger *zap.Logger) {
 	sig := <-sigs
 	logger.Info("signal received", zap.String("signal", sig.String()))
 	f()
+}
+
+// This custom Render replaces Echo's echo.Context.Render() with templ's templ.Component.Render().
+func Render(c echo.Context, statusCode int, component templ.Component) error {
+	buf := templ.GetBuffer()
+	defer templ.ReleaseBuffer(buf)
+
+	if err := component.Render(c.Request().Context(), buf); err != nil {
+		return err
+	}
+
+	return c.HTML(statusCode, buf.String())
 }

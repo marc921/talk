@@ -15,6 +15,7 @@ run:
 	FROM alpine:latest
 	WORKDIR /bin
 	COPY +build/talkserver /bin/talkserver
+	COPY ./server_database.sqlite3 /bin/server_database.sqlite3
 	EXPOSE 443
 	ENTRYPOINT ["./talkserver"]
 	SAVE IMAGE marcbrunlearning/talk_server:latest

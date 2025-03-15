@@ -11,6 +11,7 @@ import (
 type PlainText = []byte
 
 var ErrUserAlreadyExists = errors.New("user already exists")
+var ErrNotFound = errors.New("not found")
 
 type PublicUser struct {
 	Name      openapi.Username

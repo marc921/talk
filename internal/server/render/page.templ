@@ -1,30 +1,55 @@
 package render
 
+//go:generate templ generate
+
 templ Page(username string) {
     <!DOCTYPE html>
     <html lang="en">
-        <head>
-            <meta charset="UTF-8"/>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-            <title>My Templ Page</title>
-            <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-            <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"/>
-        </head>
-        <body class="bg-gray-100">
-            <div class="container mx-auto px-4 py-8">
-                @header()
-                @greeting(username)
-                @counter()
-            </div>
-        </body>
+    <head>
+        <meta charset="utf-8">
+        // viewport help rendering on mobile devices
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        // SEO
+        <meta name="description" content="Software Engineer specializing in Go. Based in Paris, France. This is a portfolio of my projects, apps, and games.">
+        <meta name="author" content="Marc Brun">
+        <title>Marc Brun - Software Engineer Portfolio</title>
+        <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚀</text></svg>">
+        // Tailwind CSS allows using utility classes to style the page
+        <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"/>
+        // HTMX allows adding dynamic behavior to the page
+        // <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    </head>
+    <body class="bg-gray-100">
+        @navbar()
+        <div class="container mx-auto px-4 py-8">
+            @greeting(username)
+            @counter()
+        </div>
+    </body>
     </html>
 }
 
-templ header() {
-    <header class="bg-white shadow rounded-lg mb-8 p-6">
-        <h1 class="text-3xl font-bold text-gray-900">Welcome to Templ</h1>
-        <p class="text-gray-600">A type-safe template engine for Go</p>
-    </header>
+templ navbar() {
+<nav class="bg-gray-800 p-4 fixed w-full top-0">
+    <div class="max-w-4xl mx-auto flex justify-between items-center">
+        <a href="/" 
+           class="text-white font-bold hover:text-gray-300 transition-colors">
+            Home
+        </a>
+        
+        <div class="flex gap-6">
+            <a href="https://github.com/marc921" 
+               class="text-gray-300 hover:text-white transition-colors">
+                GitHub
+            </a>
+            <a href="https://www.linkedin.com/in/marc-brun-175218112/" 
+               class="text-gray-300 hover:text-white transition-colors">
+                LinkedIn
+            </a>
+        </div>
+    </div>
+</nav>
+<div class="h-16"></div> // Spacer to prevent content from hiding under fixed navbar
 }
 
 templ greeting(username string) {
