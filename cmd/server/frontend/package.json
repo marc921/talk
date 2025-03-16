@@ -1,0 +1,49 @@
+{
+  "browserslist": {
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ],
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ]
+  },
+  "dependencies": {
+    "@types/node": "^16.18.12",
+    "@types/react": "^18.0.28",
+    "@types/react-dom": "^18.0.11",
+    "@types/react-router-dom": "^5.3.3",
+    "autoprefixer": "^10.4.15",
+    "postcss": "^8.4.28",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.15.0",
+    "react-scripts": "5.0.1",
+    "tailwindcss": "^3.3.3",
+    "typescript": "^4.9.5"
+  },
+  "devDependencies": {
+    "npm-run-all": "^4.1.5"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app"
+    ]
+  },
+  "homepage": ".",
+  "name": "react-go-app",
+  "private": true,
+  "scripts": {
+    "build": "npm run build:css && react-scripts build",
+    "build:css": "tailwindcss -i ./src/App.css -o ./src/tailwind.css --minify",
+    "eject": "react-scripts eject",
+    "start": "npm-run-all --parallel watch:css start:react",
+    "start:react": "react-scripts start",
+    "test": "react-scripts test",
+    "watch:css": "tailwindcss -i ./src/App.css -o ./src/tailwind.css --watch"
+  },
+  "version": "0.1.0"
+}

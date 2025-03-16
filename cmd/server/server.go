@@ -22,11 +22,10 @@ import (
 
 	"github.com/marc921/talk/internal/server"
 	"github.com/marc921/talk/internal/server/database"
-	"github.com/marc921/talk/internal/server/render"
 )
 
-//go:embed static
-var staticFiles embed.FS
+//go:embed frontend/build
+var frontendFiles embed.FS
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -77,22 +76,6 @@ func main() {
 	e.Use(middleware.Logger())
 	e.Debug = true
 
-	// Client
-	e.GET("/client", func(c echo.Context) error {
-		return c.File("./public/talkclient")
-	})
-
-	// Front-end
-	e.GET("/", func(c echo.Context) error {
-		return Render(c, http.StatusOK, render.Page("world"))
-	})
-
-	fsys, err := fs.Sub(staticFiles, "static")
-	if err != nil {
-		logger.Fatal("fs.Sub", zap.Error(err))
-	}
-	e.GET("/static/*", echo.WrapHandler(http.StripPrefix("/static/", http.FileServer(http.FS(fsys)))))
-
 	// API
 	v1 := e.Group("/api/v1")
 	v1.GET("/auth/:username", api.GetAuth)
@@ -109,6 +92,42 @@ func main() {
 	websocket := v1.Group("/ws")
 	websocket.Use(echojwt.JWT([]byte(config.AuthTokenSecretKey)))
 	websocket.GET("/:username", api.RegisterWebsocketClient)
+
+	// Client
+	e.GET("/client", func(c echo.Context) error {
+		return c.File("./public/talkclient")
+	})
+
+	// Front-end
+	frontend := e.Group("")
+	fsys, err := fs.Sub(frontendFiles, "frontend/build")
+	if err != nil {
+		logger.Fatal("fs.Sub", zap.Error(err))
+	}
+	frontendFileServer := http.FileServer(http.FS(fsys))
+	frontend.GET("/static/*", echo.WrapHandler(frontendFileServer))
+
+	// Handle all other routes by serving index.html (for client-side routing)
+	frontend.GET("/*", func(c echo.Context) error {
+		reqPath := c.Request().URL.Path[1:] // Remove leading slash
+		_, err := fsys.Open(reqPath)
+
+		// If the file exists and isn't a directory, serve it
+		if err == nil {
+			info, _ := fs.Stat(fsys, reqPath)
+			if !info.IsDir() {
+				return echo.WrapHandler(frontendFileServer)(c)
+			}
+		}
+
+		// For all other routes, serve index.html for client-side routing
+		indexHTML, err := fsys.Open("index.html")
+		if err != nil {
+			return fmt.Errorf("failed to open index.html: %w", err)
+		}
+		defer indexHTML.Close()
+		return c.Stream(http.StatusOK, "text/html", indexHTML)
+	})
 
 	// Start server
 	errGrp, ctx := errgroup.WithContext(ctx)

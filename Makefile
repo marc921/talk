@@ -11,7 +11,7 @@ DB_CLIENT_DIR=internal/client/database
 DB_SERVER_DIR=internal/server/database
 
 .PHONY: build-server
-build-server:
+build-server: build-react
 	earthly +build
 	earthly +run
 	@docker login -u ${DOCKER_USER} --password-stdin <<< ${DOCKER_PASSWORD}
@@ -37,8 +37,7 @@ deploy-server: build-server restart-server
 
 .PHONY: local-server
 local-server:
-	templ generate
-	TLS=false go run ./cmd/server
+	DATABASE_URL=server_database.sqlite3 TLS=false go run ./cmd/server
 
 .PHONY: build-client
 build-client:
@@ -87,3 +86,17 @@ generate:	# (Re)Generate automatically generated code, including sqlc queries an
 prune:	# Prune docker and earthly cache
 	docker system prune -a
 	earthly prune
+
+.PHONY: build-react
+build-react:
+	@echo "Installing npm dependencies..."
+	cd cmd/server/frontend && npm install
+	@echo "Type checking TypeScript..."
+	cd cmd/server/frontend && npx tsc --noEmit
+	@echo "Building Tailwind CSS..."
+	cd cmd/server/frontend && npx tailwindcss -i ./src/App.css -o ./src/tailwind.css
+	@echo "Building React app..."
+	cd cmd/server/frontend && npm run build
+
+local-frontend:
+	cd cmd/server/frontend && npm start

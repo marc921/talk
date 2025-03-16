@@ -1,2 +1,4 @@
 .env
 */*.pem
+cmd/server/frontend/node_modules
+cmd/server/frontend/build
