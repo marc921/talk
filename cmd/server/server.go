@@ -74,6 +74,10 @@ func main() {
 		e.AutoTLSManager.Cache = autocert.DirCache("/var/www/.cache")
 	}
 	e.Use(middleware.Logger())
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins: []string{"http://localhost:3000", "https://marcbrun.eu"},
+		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete},
+	}))
 	e.Debug = true
 
 	// API
@@ -83,6 +87,8 @@ func main() {
 
 	v1.GET("/users/:username", api.GetUser)
 	v1.POST("/users", api.AddUser)
+
+	v1.GET("/qrcode", api.GenerateQRCode)
 
 	messages := v1.Group("/messages")
 	messages.Use(echojwt.JWT([]byte(config.AuthTokenSecretKey)))
@@ -120,13 +126,8 @@ func main() {
 			}
 		}
 
-		// For all other routes, serve index.html for client-side routing
-		indexHTML, err := fsys.Open("index.html")
-		if err != nil {
-			return fmt.Errorf("failed to open index.html: %w", err)
-		}
-		defer indexHTML.Close()
-		return c.Stream(http.StatusOK, "text/html", indexHTML)
+		// Serve index.html for client-side routing
+		return c.File("frontend/build/index.html")
 	})
 
 	// Start server

@@ -10,15 +10,27 @@ SERVER_DATABASE_URL=sqlite3:server_database.sqlite3
 DB_CLIENT_DIR=internal/client/database
 DB_SERVER_DIR=internal/server/database
 
+# Define some color variables
+RED=\033[0;31m
+GREEN=\033[0;32m
+YELLOW=\033[0;33m
+BLUE=\033[0;34m
+PURPLE=\033[0;35m
+CYAN=\033[0;36m
+NC=\033[0m # No Color
+
 .PHONY: build-server
 build-server: build-react
+	@printf "${BLUE}🏗️ Building server...${NC}\n"
 	earthly +build
 	earthly +run
 	@docker login -u ${DOCKER_USER} --password-stdin <<< ${DOCKER_PASSWORD}
 	docker push ${DOCKER_USER}/talk_server:latest
+	@printf "${GREEN}✅ Server built successfully${NC}\n"
 
 .PHONY: restart-server
 restart-server:
+	@printf "${BLUE}🔄 Restarting server...${NC}\n"
 	ssh $(REMOTE_HOST) ' \
 		if [ -n "$$(docker ps -a -q)" ]; then docker stop $$(docker ps -a -q) && docker rm `docker ps -a -q`; fi && \
 		docker image rm ${DOCKER_USER}/talk_server || true && \
@@ -31,6 +43,7 @@ restart-server:
 			--volume ~/public/:/bin/public/ \
 			${DOCKER_USER}/talk_server \
 		'
+	@printf "${GREEN}✅ Server restarted successfully${NC}\n"
 
 .PHONY: deploy-server
 deploy-server: build-server restart-server
@@ -41,18 +54,20 @@ local-server:
 
 .PHONY: build-client
 build-client:
+	@printf "${BLUE}🏗️ Building client...${NC}\n"
 	CGO_ENABLED=1 go build -o $(CLIENT_BINARY) ./cmd/client
+	@printf "${GREEN}✅ Client built successfully${NC}\n"
 
 .PHONY: push-client
 push-client: build-client
-	@echo "Deploying to $(REMOTE_HOST)..."
+	@printf "${BLUE}🚀 Pushing client to remote host $(REMOTE_HOST)...${NC}\n"
 	rsync -avz --progress $(CLIENT_BINARY) $(REMOTE_HOST):$(CLIENT_REMOTE_PATH)
 	@if [ $$? -eq 0 ]; then \
-		echo "Deployment successful"; \
+		printf "${GREEN}✅ Client pushed successfully${NC}\n"; \
 		ssh $(REMOTE_HOST) 'chmod +x $(CLIENT_REMOTE_PATH)'; \
 		rm $(CLIENT_BINARY); \
 	else \
-		echo "Deployment failed"; \
+		printf "${RED}❌ Error pushing client${NC}\n"; \
 		rm $(CLIENT_BINARY); \
 		exit 1; \
 	fi
@@ -89,13 +104,13 @@ prune:	# Prune docker and earthly cache
 
 .PHONY: build-react
 build-react:
-	@echo "Installing npm dependencies..."
+	@printf "${BLUE}📦 Installing npm dependencies...${NC}\n"
 	cd cmd/server/frontend && npm install
-	@echo "Type checking TypeScript..."
+	@printf "${BLUE}🔍 Type checking TypeScript...${NC}\n"
 	cd cmd/server/frontend && npx tsc --noEmit
-	@echo "Building Tailwind CSS..."
+	@printf "${BLUE}💅 Building Tailwind CSS...${NC}\n"
 	cd cmd/server/frontend && npx tailwindcss -i ./src/App.css -o ./src/tailwind.css
-	@echo "Building React app..."
+	@printf "${BLUE}⚛️ Building React app...${NC}\n"
 	cd cmd/server/frontend && npm run build
 
 local-frontend:

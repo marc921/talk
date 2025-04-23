@@ -1,4 +1,4 @@
-import React, { FC } from 'react';
+import { FC } from 'react';
 import Counter from './Counter';
 
 const Home: FC = () => {
@@ -9,7 +9,7 @@ const Home: FC = () => {
         <p className="text-xl mb-8">
           This TypeScript React app with Tailwind CSS is being served from a Go server.
         </p>
-        
+
         <div className="flex flex-wrap justify-center gap-6 mt-8">
           <Counter label="Counter 1" initialCount={5} />
           <Counter label="Counter 2" initialCount={10} />
