@@ -18,7 +18,7 @@ func (a *API) CompressImage(c echo.Context) error {
 	// Get the file from the request
 	file, err := c.FormFile("image")
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "No image provided"})
+		return echo.NewHTTPError(http.StatusBadRequest, "No image provided").WithInternal(err)
 	}
 
 	// Get quality parameter (default to 75 if not specified)
@@ -35,14 +35,14 @@ func (a *API) CompressImage(c echo.Context) error {
 	// Open the file
 	src, err := file.Open()
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to open image"})
+		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to open image").WithInternal(err)
 	}
 	defer src.Close()
 
 	// Decode the image
 	img, format, err := decodeImage(src, file)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Failed to decode image: " + err.Error()})
+		return echo.NewHTTPError(http.StatusBadRequest, "Failed to decode image").WithInternal(err)
 	}
 
 	// Prepare the response

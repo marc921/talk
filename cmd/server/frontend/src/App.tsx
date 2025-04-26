@@ -5,15 +5,19 @@ import Home from './components/Home';
 import Navbar from './components/Navbar';
 import QRCodeGenerator from './components/QRCode';
 import ImageCompressor from './components/ImageCompressor';
+import PdfTextExtractor from './components/PdfTextExtractor';
+import HTMLToMarkdownConverter from './components/HTMLToMarkdown';
 
 export const API_URL = 'http://localhost:8080';
 
 // Define routes in a configuration array
 const routes = [
-  { path: '/', element: <Home />, label: 'Home' },
+  { path: '/', element: <Home />, label: 'marcbrun.eu' },
   { path: '/about', element: <AboutMe />, label: 'About Me' },
   { path: '/qrcode', element: <QRCodeGenerator />, label: 'QR Code Generator' },
   { path: '/compress/image', element: <ImageCompressor />, label: 'Image Compressor' },
+  { path: '/extract/pdf', element: <PdfTextExtractor />, label: 'PDF Text Extractor' },
+  { path: '/convert/html', element: <HTMLToMarkdownConverter />, label: 'HTML to Markdown Converter' },
 ];
 
 const App: FC = () => {
