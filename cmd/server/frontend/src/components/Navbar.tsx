@@ -17,24 +17,28 @@ const Navbar: FC<NavbarProps> = ({ routes }) => {
 
   return (
     <nav className="bg-gray-800 p-4">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center">
-          <div className="text-white font-bold text-xl">
-            React + Go App
-          </div>
+      <div className="max-w-6xl mx-auto flex justify-between items-center">
+        {/* First route aligned on the left */}
+        <div className="text-white font-bold text-xl">
+          <Link
+            to={routes[0].path}
+            className={`px-3 py-2 rounded text-white hover:bg-gray-700`}
+          >
+            {routes[0].label}
+          </Link>
+        </div>
 
-          <div className="flex space-x-4">
-            {/* Dynamically generate buttons for each route */}
-            {routes.map((route) => (
-              <Link
-                key={route.path}
-                to={route.path}
-                className={`px-3 py-2 rounded text-white ${isActive(route.path)}`}
-              >
-                {route.label}
-              </Link>
-            ))}
-          </div>
+        {/* All other routes aligned on the right */}
+        <div className="flex space-x-4">
+          {routes.slice(1).map((route) => (
+            <Link
+              key={route.path}
+              to={route.path}
+              className={`px-3 py-2 rounded text-white ${isActive(route.path)}`}
+            >
+              {route.label}
+            </Link>
+          ))}
         </div>
       </div>
     </nav>

@@ -44,6 +44,7 @@ restart-server:
 			${DOCKER_USER}/talk_server \
 		'
 	@printf "${GREEN}✅ Server restarted successfully${NC}\n"
+	@printf "${YELLOW}💡 Remember to run 'sudo apt-get install poppler-utils'${NC}\n"
 
 .PHONY: deploy-server
 deploy-server: build-server restart-server

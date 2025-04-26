@@ -91,6 +91,8 @@ func main() {
 
 	v1.GET("/qrcode", api.GenerateQRCode)
 	v1.POST("/compress/image", api.CompressImage)
+	v1.POST("/extract/pdf", api.ExtractPdfText)
+	v1.POST("/html-to-markdown", api.ConvertHTMLToMarkdown)
 
 	messages := v1.Group("/messages")
 	messages.Use(echojwt.JWT([]byte(config.AuthTokenSecretKey)))
