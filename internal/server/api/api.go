@@ -1,4 +1,4 @@
-package server
+package api
 
 import (
 	"errors"
@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/marc921/talk/internal/cryptography"
+	"github.com/marc921/talk/internal/server/controller"
 	"github.com/marc921/talk/internal/types"
 	"github.com/marc921/talk/internal/types/openapi"
 )
@@ -18,14 +19,14 @@ import (
 type API struct {
 	logger        *zap.Logger
 	Authenticator *Authenticator
-	Controller    *ServerController
+	Controller    *controller.ServerController
 	WebsocketHub  *WebSocketHub
 }
 
 func NewAPI(
 	logger *zap.Logger,
 	authenticator *Authenticator,
-	controller *ServerController,
+	controller *controller.ServerController,
 	websocketHub *WebSocketHub,
 ) *API {
 	return &API{

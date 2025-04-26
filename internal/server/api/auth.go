@@ -1,4 +1,4 @@
-package server
+package api
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
+	"github.com/marc921/talk/internal/server/controller"
 	"github.com/marc921/talk/internal/types/openapi"
 )
 
@@ -80,7 +81,7 @@ func (a *Authenticator) GenerateAuthChallenge(username openapi.Username) (*opena
 func (a *Authenticator) VerifyAuthChallenge(
 	ctx context.Context,
 	signedAuthChallenge *openapi.AuthChallengeSigned,
-	controller *ServerController,
+	controller *controller.ServerController,
 ) (openapi.Username, error) {
 	token, err := jwt.Parse(
 		signedAuthChallenge.Token,

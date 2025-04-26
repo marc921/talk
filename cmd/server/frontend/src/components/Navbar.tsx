@@ -1,7 +1,11 @@
 import { FC } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
-const Navbar: FC = () => {
+interface NavbarProps {
+  routes: { path: string; label: string }[];
+}
+
+const Navbar: FC<NavbarProps> = ({ routes }) => {
   const location = useLocation();
 
   // Function to determine if a link is active
@@ -20,24 +24,16 @@ const Navbar: FC = () => {
           </div>
 
           <div className="flex space-x-4">
-            <Link
-              to="/"
-              className={`px-3 py-2 rounded text-white ${isActive('/')}`}
-            >
-              Home
-            </Link>
-            <Link
-              to="/qrcode"
-              className={`px-3 py-2 rounded text-white ${isActive('/qrcode')}`}
-            >
-              QRCode Generator
-            </Link>
-            <Link
-              to="/about"
-              className={`px-3 py-2 rounded text-white ${isActive('/about')}`}
-            >
-              About Me
-            </Link>
+            {/* Dynamically generate buttons for each route */}
+            {routes.map((route) => (
+              <Link
+                key={route.path}
+                to={route.path}
+                className={`px-3 py-2 rounded text-white ${isActive(route.path)}`}
+              >
+                {route.label}
+              </Link>
+            ))}
           </div>
         </div>
       </div>

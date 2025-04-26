@@ -20,7 +20,8 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/marc921/talk/internal/server"
+	"github.com/marc921/talk/internal/server/api"
+	"github.com/marc921/talk/internal/server/controller"
 	"github.com/marc921/talk/internal/server/database"
 )
 
@@ -48,7 +49,7 @@ func main() {
 		logger.Fatal("database.NewSQLite3DB", zap.Error(err))
 	}
 
-	authenticator := server.NewAuthenticator(
+	authenticator := api.NewAuthenticator(
 		config.AuthChallengeSecretKey,
 		config.AuthTokenSecretKey,
 		64,
@@ -56,13 +57,13 @@ func main() {
 		time.Hour,
 	)
 
-	controller := server.NewServerController(logger, db)
-	websocketHub := server.NewWebSocketHub(logger)
+	serverController := controller.NewServerController(logger, db)
+	websocketHub := api.NewWebSocketHub(logger)
 
-	api := server.NewAPI(
+	api := api.NewAPI(
 		logger,
 		authenticator,
-		controller,
+		serverController,
 		websocketHub,
 	)
 
@@ -89,6 +90,7 @@ func main() {
 	v1.POST("/users", api.AddUser)
 
 	v1.GET("/qrcode", api.GenerateQRCode)
+	v1.POST("/compress/image", api.CompressImage)
 
 	messages := v1.Group("/messages")
 	messages.Use(echojwt.JWT([]byte(config.AuthTokenSecretKey)))
