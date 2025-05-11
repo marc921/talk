@@ -12,7 +12,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/a-h/templ"
 	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -130,8 +129,13 @@ func main() {
 			}
 		}
 
-		// Serve index.html for client-side routing
-		return c.File("frontend/build/index.html")
+		// For all other routes, serve index.html for client-side routing
+		indexHTML, err := fsys.Open("index.html")
+		if err != nil {
+			return fmt.Errorf("failed to open index.html: %w", err)
+		}
+		defer indexHTML.Close()
+		return c.Stream(http.StatusOK, "text/html", indexHTML)
 	})
 
 	// Start server
@@ -189,16 +193,4 @@ func OnSignal(f func(), logger *zap.Logger) {
 	sig := <-sigs
 	logger.Info("signal received", zap.String("signal", sig.String()))
 	f()
-}
-
-// This custom Render replaces Echo's echo.Context.Render() with templ's templ.Component.Render().
-func Render(c echo.Context, statusCode int, component templ.Component) error {
-	buf := templ.GetBuffer()
-	defer templ.ReleaseBuffer(buf)
-
-	if err := component.Render(c.Request().Context(), buf); err != nil {
-		return err
-	}
-
-	return c.HTML(statusCode, buf.String())
 }

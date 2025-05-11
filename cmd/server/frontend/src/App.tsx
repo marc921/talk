@@ -2,13 +2,13 @@ import { FC } from 'react';
 import { Route, BrowserRouter as Router, Routes } from 'react-router-dom';
 import AboutMe from './components/AboutMe';
 import Home from './components/Home';
-import Navbar from './components/Navbar';
-import QRCodeGenerator from './components/QRCode';
-import ImageCompressor from './components/ImageCompressor';
-import PdfTextExtractor from './components/PdfTextExtractor';
 import HTMLToMarkdownConverter from './components/HTMLToMarkdown';
+import ImageCompressor from './components/ImageCompressor';
+import Navbar from './components/Navbar';
+import PdfTextExtractor from './components/PdfTextExtractor';
+import QRCodeGenerator from './components/QRCode';
 
-export const API_URL = 'http://localhost:8080';
+export const API_URL = process.env.API_URL || 'http://localhost:8080/api/v1';
 
 // Define routes in a configuration array
 const routes = [

@@ -2,11 +2,12 @@ package api
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"path/filepath"
 
+	pdftotext "github.com/heussd/pdftotext-go"
 	"github.com/labstack/echo/v4"
-	"github.com/young2j/oxmltotext/pdftotext"
 )
 
 func (a *API) ExtractPdfText(c echo.Context) error {
@@ -28,16 +29,21 @@ func (a *API) ExtractPdfText(c echo.Context) error {
 	}
 	defer src.Close()
 
-	// Create PDF reader
-	pdfReader, err := pdftotext.OpenReader(src)
+	// Read file into byte slice
+	fileContent, err := io.ReadAll(src)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to read PDF file").WithInternal(err)
 	}
-	defer pdfReader.Close()
 
-	textContent, err := pdfReader.ExtractTexts()
+	// Extract pages texts from the PDF
+	pdfPages, err := pdftotext.Extract(fileContent)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to extract text from PDF").WithInternal(err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to read PDF file").WithInternal(err)
+	}
+	// Concatenate all pages into a single string
+	textContent := ""
+	for _, page := range pdfPages {
+		textContent += fmt.Sprintf("Page %d:\n%s\n", page.Number, page.Content)
 	}
 
 	// Set headers for text file download

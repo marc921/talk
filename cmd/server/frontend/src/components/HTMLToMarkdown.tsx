@@ -30,7 +30,7 @@ const HTMLToMarkdownConverter = () => {
       const formData = new FormData();
       formData.append('html', file);
 
-      const response = await fetch(API_URL + '/api/v1/html-to-markdown', {
+      const response = await fetch(`${API_URL}/html-to-markdown`, {
         method: 'POST',
         body: formData,
       });

@@ -10,7 +10,7 @@ const QRCodeGenerator: React.FC = () => {
   useEffect(() => {
     if (!content.trim()) return;
 
-    const url = API_URL+`/api/v1/qrcode?content=${encodeURIComponent(content)}&size=${size}&color=${color}`;
+    const url = `${API_URL}/qrcode?content=${encodeURIComponent(content)}&size=${size}&color=${color}`;
     setQrCodeUrl(url);
   }, [content, size, color]);
 

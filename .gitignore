@@ -2,5 +2,6 @@
 */*.pem
 cmd/server/frontend/node_modules
 cmd/server/frontend/build
+cmd/server/frontend/.env.*
 server_database.sqlite3
 node_modules
