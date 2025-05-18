@@ -40,9 +40,9 @@ var rootCmd = &cobra.Command{
 			logger.Fatal("LoadConfig", zap.Error(err))
 		}
 
-		db, err := database.NewSQLite3DB(path.Join(config.HomeDir, "database.sqlite3"))
+		db, err := database.GetOrCreateSQLite3DB(path.Join(config.HomeDir, "database.sqlite3"))
 		if err != nil {
-			logger.Fatal("database.NewSQLite3DB", zap.Error(err))
+			logger.Fatal("database.GetOrCreateSQLite3DB", zap.Error(err))
 		}
 
 		openapiClient, err := openapi.NewClientWithResponses(
@@ -84,9 +84,9 @@ func mustGetCLIHandler(
 		logger.Fatal("LoadConfig", zap.Error(err))
 	}
 
-	db, err := database.NewSQLite3DB(path.Join(config.HomeDir, "database.sqlite3"))
+	db, err := database.GetOrCreateSQLite3DB(path.Join(config.HomeDir, "database.sqlite3"))
 	if err != nil {
-		logger.Fatal("database.NewSQLite3DB", zap.Error(err))
+		logger.Fatal("database.GetOrCreateSQLite3DB", zap.Error(err))
 	}
 
 	openapiClient, err := openapi.NewClientWithResponses(
