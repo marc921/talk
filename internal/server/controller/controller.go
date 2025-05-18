@@ -18,12 +18,12 @@ import (
 
 type ServerController struct {
 	logger *zap.Logger
-	db     *sql.DB
+	db     sqlcgen.DBTX
 }
 
 func NewServerController(
 	logger *zap.Logger,
-	db *sql.DB,
+	db sqlcgen.DBTX,
 ) *ServerController {
 	return &ServerController{
 		logger: logger.With(zap.String("component", "controller")),
@@ -50,13 +50,18 @@ func (s *ServerController) AddUser(
 		PublicKey: publicKeyBytes,
 	})
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			// Insert failed because of name conflict: user already exists
+			if !bytes.Equal(user.PublicKey, publicKeyBytes) {
+				// Only return error if different public key, for idempotency
+				return true, types.ErrUserAlreadyExists
+			}
+			return true, nil
+		}
 		return false, fmt.Errorf("queries.InsertUser: %w", err)
 	}
-	if !bytes.Equal(user.PublicKey, publicKeyBytes) {
-		return true, types.ErrUserAlreadyExists
-	}
 
-	return user.Column1, nil
+	return false, nil
 }
 
 func (s *ServerController) GetUserPublicKey(

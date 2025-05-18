@@ -6,7 +6,8 @@ CLIENT_REMOTE_PATH := ~/public/talkclient
 CLIENT_BINARY := talkclient
 
 CLIENT_DATABASE_URL=sqlite3:$(HOME)/.config/talk/database.sqlite3
-SERVER_DATABASE_URL=sqlite3:server_database.sqlite3
+SERVER_DATABASE_URL=postgres://myuser:mypassword@localhost:5432/mydb?sslmode=disable
+TUNNEL_SERVER_DATABASE_URL=postgres://myuser:mypassword@localhost:15432/mydb?sslmode=disable
 DB_CLIENT_DIR=internal/client/database
 DB_SERVER_DIR=internal/server/database
 
@@ -32,7 +33,9 @@ build-server: build-react
 restart-server:
 	@printf "${BLUE}🔄 Restarting server...${NC}\n"
 	ssh $(REMOTE_HOST) ' \
-		if [ -n "$$(docker ps -a -q)" ]; then docker stop $$(docker ps -a -q) && docker rm `docker ps -a -q`; fi && \
+		if docker ps -a --format "{{.Names}}" | grep -q "^talk_server$$"; then \
+			docker stop talk_server && docker rm talk_server; \
+		fi && \
 		docker image rm ${DOCKER_USER}/talk_server || true && \
 		docker run -d \
 			-e AUTH_CHALLENGE_SECRET_KEY=${AUTH_CHALLENGE_SECRET_KEY} \
@@ -41,16 +44,13 @@ restart-server:
 			--network host \
 			--name talk_server \
 			--volume ~/public/:/bin/public/ \
+			--volume ~/talk_tls_cache:/var/www/.cache \
 			${DOCKER_USER}/talk_server \
 		'
 	@printf "${GREEN}✅ Server restarted successfully${NC}\n"
 
 .PHONY: deploy-server
 deploy-server: build-server restart-server
-
-.PHONY: local-server
-local-server:
-	DATABASE_URL=server_database.sqlite3 TLS=false go run ./cmd/server
 
 .PHONY: build-client
 build-client:
@@ -82,16 +82,51 @@ recreate-client-db:
 
 .PHONY: recreate-server-db
 recreate-server-db:
-	dbmate --url $(SERVER_DATABASE_URL) --migrations-dir $(DB_SERVER_DIR)/migrations --schema-file $(DB_SERVER_DIR)/schema.sql drop
-	dbmate --url $(SERVER_DATABASE_URL) --migrations-dir $(DB_SERVER_DIR)/migrations --schema-file $(DB_SERVER_DIR)/schema.sql up
+	ssh -L 15432:localhost:5432 $(REMOTE_HOST) -N & \
+	TUNNEL_PID=$$!; \
+	echo "SSH tunnel started with PID $$TUNNEL_PID"; \
+	sleep 1; \
+	dbmate --url $(TUNNEL_SERVER_DATABASE_URL) --migrations-dir $(DB_SERVER_DIR)/migrations --schema-file $(DB_SERVER_DIR)/schema.sql drop; \
+	dbmate --url $(TUNNEL_SERVER_DATABASE_URL) --migrations-dir $(DB_SERVER_DIR)/migrations --schema-file $(DB_SERVER_DIR)/schema.sql up; \
+	kill $$TUNNEL_PID
 
 .PHONY: server-db-add-migration
 server-db-add-migration:
 	@if [ -z "$$name" ]; then \
 		echo "Error: Migration name is required. Usage: make server-db-add-migration name=<migration_name>"; \
 		exit 1; \
-	fi
-	dbmate --url $(SERVER_DATABASE_URL) --migrations-dir $(DB_SERVER_DIR)/migrations new $$name
+	fi; \
+	ssh -L 15432:localhost:5432 $(REMOTE_HOST) -N & \
+	TUNNEL_PID=$$!; \
+	echo "SSH tunnel started with PID $$TUNNEL_PID"; \
+	sleep 1; \
+	dbmate --url $(TUNNEL_SERVER_DATABASE_URL) --migrations-dir $(DB_SERVER_DIR)/migrations new $$name; \
+	kill $$TUNNEL_PID
+
+server-db-connect:
+	ssh -L 15432:localhost:5432 $(REMOTE_HOST) -N & \
+	TUNNEL_PID=$$!; \
+	echo "SSH tunnel started with PID $$TUNNEL_PID"; \
+	sleep 1; \
+	PGPASSWORD=mypassword psql -h localhost -p 15432 -U myuser -d mydb; \
+	kill $$TUNNEL_PID
+
+server-db-create:
+	ssh $(REMOTE_HOST) ' \
+		docker run \
+			--name postgres \
+			-e POSTGRES_PASSWORD=mypassword \
+			-e POSTGRES_USER=myuser \
+			-e POSTGRES_DB=mydb \
+			-p 5432:5432 \
+			-v postgres_data:/var/lib/postgresql/data \
+			-d postgres; \
+	'
+
+server-container-shell:
+	ssh -t $(REMOTE_HOST) ' \
+		docker exec -it talk_server -- sh; \
+	'
 
 .PHONY: generate
 generate:	# (Re)Generate automatically generated code, including sqlc queries and openapi client
@@ -111,7 +146,22 @@ build-react:
 	@printf "${BLUE}💅 Building Tailwind CSS...${NC}\n"
 	cd cmd/server/frontend && npx tailwindcss -i ./src/App.css -o ./src/tailwind.css
 	@printf "${BLUE}⚛️ Building React app...${NC}\n"
-	cd cmd/server/frontend && npm run build
+	cd cmd/server/frontend && REACT_APP_API_URL=https://marcbrun.eu/api/v1 npm run build
+
+
+.PHONY: local-server
+local-server:
+	ssh -L 15432:localhost:5432 $(REMOTE_HOST) -N & \
+	TUNNEL_PID=$$!; \
+	echo "SSH tunnel started with PID $$TUNNEL_PID"; \
+	sleep 1; \
+	DATABASE_URL=${TUNNEL_SERVER_DATABASE_URL} TLS=false go run ./cmd/server; \
+	kill $$TUNNEL_PID
 
 local-frontend:
-	cd cmd/server/frontend && npm start
+	cd cmd/server/frontend && REACT_APP_API_URL=http://localhost:8080/api/v1 npm start
+
+local-client:
+	go run ./cmd/client
+
+reset-db: recreate-client-db recreate-server-db generate

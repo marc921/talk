@@ -20,7 +20,6 @@ run:
 	# poppler-utils is required for PDF text extraction
 	RUN apk add --no-cache poppler-utils
 	COPY +build/talkserver /bin/talkserver
-	COPY ./server_database.sqlite3 /bin/server_database.sqlite3
 	EXPOSE 443
 	ENTRYPOINT ["./talkserver"]
 	SAVE IMAGE marcbrunlearning/talk_server:latest

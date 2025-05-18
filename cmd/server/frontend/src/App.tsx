@@ -8,7 +8,7 @@ import Navbar from './components/Navbar';
 import PdfTextExtractor from './components/PdfTextExtractor';
 import QRCodeGenerator from './components/QRCode';
 
-export const API_URL = process.env.API_URL || 'http://localhost:8080/api/v1';
+export const API_URL = process.env.REACT_APP_API_URL; // || 'http://localhost:8080/api/v1';
 
 // Define routes in a configuration array
 const routes = [

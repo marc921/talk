@@ -29,15 +29,9 @@ var UISingleton *UI
 
 func InitUI(
 	config *Config,
+	openapiClient *openapi.ClientWithResponses,
 	db *sql.DB,
 ) error {
-	openapiClient, err := openapi.NewClientWithResponses(
-		config.Server.URL,
-	)
-	if err != nil {
-		return fmt.Errorf("openapi.NewClientWithResponses: %w", err)
-	}
-
 	UISingleton = &UI{
 		actions:       make(chan Action, 100),
 		db:            db,

@@ -1,11 +1,11 @@
 version: "2"
 sql:
-  - engine: "sqlite"
+  - engine: "postgresql"
     queries: "queries"
     schema: "schema.sql"
     gen:
       go:
         out: "sqlcgen"
         package: "sqlcgen"
-        sql_package: "database/sql"
+        sql_package: "pgx/v5"
         emit_result_struct_pointers: true

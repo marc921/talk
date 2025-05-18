@@ -43,10 +43,12 @@ func main() {
 		logger.Fatal("LoadConfig", zap.Error(err))
 	}
 
-	db, err := database.NewSQLite3DB(config.DatabaseURL)
+	// Connect to PostgreSQL
+	db, err := database.NewPostgresPool(config.DatabaseURL)
 	if err != nil {
-		logger.Fatal("database.NewSQLite3DB", zap.Error(err))
+		logger.Fatal("database.NewPostgresPool", zap.Error(err))
 	}
+	defer db.Close()
 
 	authenticator := api.NewAuthenticator(
 		config.AuthChallengeSecretKey,
@@ -71,6 +73,7 @@ func main() {
 
 	if config.TLS {
 		e.AutoTLSManager.HostPolicy = autocert.HostWhitelist("marcbrun.eu")
+		// Store TLS certs in a directory mapped to a host volume for persistence
 		e.AutoTLSManager.Cache = autocert.DirCache("/var/www/.cache")
 	}
 	e.Use(middleware.Logger())

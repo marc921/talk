@@ -20,6 +20,7 @@ type User struct {
 	key              *rsa.PrivateKey
 	client           *Client
 	authToken        *string
+	db               *sql.DB
 	conversations    map[openapi.Username]*Conversation
 	inboundMessages  chan *openapi.Message
 	outboundMessages chan *openapi.Message
@@ -27,6 +28,8 @@ type User struct {
 
 func NewUser(
 	localUser *sqlcgen.LocalUser,
+	openapiClient *openapi.ClientWithResponses,
+	db *sql.DB,
 ) (*User, error) {
 	privKey, err := cryptography.UnmarshalPrivateKey(localUser.PrivateKey)
 	if err != nil {
@@ -35,7 +38,8 @@ func NewUser(
 	user := &User{
 		name:             localUser.Name,
 		key:              privKey,
-		client:           NewClient(UISingleton.openapiClient, localUser.Name),
+		client:           NewClient(openapiClient, localUser.Name),
+		db:               db,
 		conversations:    make(map[openapi.Username]*Conversation),
 		inboundMessages:  make(chan *openapi.Message),
 		outboundMessages: make(chan *openapi.Message),
@@ -85,9 +89,9 @@ func (u *User) RegisterWebSocket(ctx context.Context) error {
 	}()
 
 	go func() {
-		queries := sqlcgen.New(UISingleton.db)
+		queries := sqlcgen.New(u.db)
 		for message := range u.inboundMessages {
-			err := u.receiveMessage(ctx, queries, *message)
+			_, err := u.receiveMessage(ctx, queries, *message)
 			if err != nil {
 				UISingleton.actions <- &ActionSetError{err: fmt.Errorf("receiveMessage: %w", err)}
 			}
@@ -98,7 +102,7 @@ func (u *User) RegisterWebSocket(ctx context.Context) error {
 }
 
 func (u *User) GetPublicUser(ctx context.Context, name openapi.Username) (*types.PublicUser, error) {
-	queries := sqlcgen.New(UISingleton.db)
+	queries := sqlcgen.New(u.db)
 	// Check if the public user is already in the database
 	publicUser, err := queries.GetPublicUserByName(ctx, name)
 	if err != nil {
@@ -132,7 +136,7 @@ func (u *User) GetPublicUser(ctx context.Context, name openapi.Username) (*types
 // ListConversations fetches the conversations from the database along with their messages
 // and stores them in the user's local cache
 func (u *User) FetchConversationsFromDB(ctx context.Context) error {
-	queries := sqlcgen.New(UISingleton.db)
+	queries := sqlcgen.New(u.db)
 	dbConvs, err := queries.ListConversations(ctx, u.name)
 	if err != nil {
 		return fmt.Errorf("queries.ListConversations: %w", err)
@@ -150,7 +154,7 @@ func (u *User) FetchConversationsFromDB(ctx context.Context) error {
 }
 
 func (u *User) CreateConversation(ctx context.Context, remoteUsername openapi.Username) error {
-	queries := sqlcgen.New(UISingleton.db)
+	queries := sqlcgen.New(u.db)
 	dbConv, err := queries.InsertConversation(ctx, sqlcgen.InsertConversationParams{
 		LocalUserName:  u.name,
 		RemoteUserName: remoteUsername,
@@ -165,7 +169,11 @@ func (u *User) CreateConversation(ctx context.Context, remoteUsername openapi.Us
 func (u *User) SendMessage(ctx context.Context, plaintext types.PlainText, recipientName openapi.Username) error {
 	conversation, ok := u.conversations[recipientName]
 	if !ok {
-		return fmt.Errorf("conversation not found")
+		err := u.CreateConversation(ctx, recipientName)
+		if err != nil {
+			return fmt.Errorf("CreateConversation: %w", err)
+		}
+		conversation = u.conversations[recipientName]
 	}
 
 	encryptedMsg, err := u.encryptMessage(ctx, plaintext, recipientName)
@@ -181,12 +189,12 @@ func (u *User) SendMessage(ctx context.Context, plaintext types.PlainText, recip
 	}
 
 	// Start transaction to insert message in database and send it to remote user, rollback if any error occurs
-	tx, err := UISingleton.db.Begin()
+	tx, err := u.db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	txQueries := sqlcgen.New(UISingleton.db).WithTx(tx)
+	txQueries := sqlcgen.New(u.db).WithTx(tx)
 
 	// Insert message in database
 	dbMessage, err := txQueries.InsertMessage(ctx, sqlcgen.InsertMessageParams{
@@ -203,11 +211,11 @@ func (u *User) SendMessage(ctx context.Context, plaintext types.PlainText, recip
 	conversation.messages = append(conversation.messages, dbMessage)
 
 	// Send message to remote user
-	// err = u.client.SendMessage(ctx, *u.authToken, encryptedMsg)
-	// if err != nil {
-	// 	return fmt.Errorf("client.SendMessage: %w", err)
-	// }
-	u.outboundMessages <- encryptedMsg
+	err = u.client.SendMessage(ctx, *u.authToken, encryptedMsg)
+	if err != nil {
+		return fmt.Errorf("client.SendMessage: %w", err)
+	}
+	// u.outboundMessages <- encryptedMsg
 
 	// Commit transaction
 	err = tx.Commit()
@@ -218,63 +226,67 @@ func (u *User) SendMessage(ctx context.Context, plaintext types.PlainText, recip
 	return nil
 }
 
-func (u *User) FetchMessages(ctx context.Context) error {
+func (u *User) FetchMessages(
+	ctx context.Context,
+) ([]*sqlcgen.Message, error) {
 	// Fetch conversations and messages from the database
 	err := u.FetchConversationsFromDB(ctx)
 	if err != nil {
-		return fmt.Errorf("ListConversations: %w", err)
+		return nil, fmt.Errorf("ListConversations: %w", err)
 	}
 
 	// Fetch additional messages from the server
 	if u.authToken == nil {
 		err := u.Authenticate(ctx)
 		if err != nil {
-			return fmt.Errorf("Authenticate: %w", err)
+			return nil, fmt.Errorf("Authenticate: %w", err)
 		}
 	}
 
 	messages, err := u.client.GetMessages(ctx, *u.authToken)
 	if err != nil {
-		return fmt.Errorf("client.GetMessages: %w", err)
+		return nil, fmt.Errorf("client.GetMessages: %w", err)
 	}
 
-	queries := sqlcgen.New(UISingleton.db)
+	dbMessages := make([]*sqlcgen.Message, 0, len(messages))
+	queries := sqlcgen.New(u.db)
 	for _, message := range messages {
-		err := u.receiveMessage(ctx, queries, message)
+		dbMsg, err := u.receiveMessage(ctx, queries, message)
 		if err != nil {
-			return fmt.Errorf("receiveMessage: %w", err)
+			return nil, fmt.Errorf("receiveMessage: %w", err)
 		}
+		dbMessages = append(dbMessages, dbMsg)
 	}
-	return nil
+	return dbMessages, nil
 }
 
 func (u *User) receiveMessage(
 	ctx context.Context,
 	queries *sqlcgen.Queries,
 	message openapi.Message,
-) error {
+) (*sqlcgen.Message, error) {
 	conv, ok := u.conversations[message.Sender]
 	if !ok {
 		err := u.CreateConversation(ctx, message.Sender)
 		if err != nil {
-			return fmt.Errorf("CreateConversation: %w", err)
+			return nil, fmt.Errorf("CreateConversation: %w", err)
 		}
 		conv = u.conversations[message.Sender]
 	}
 
 	decryptedMsg, err := u.decryptMessage(message)
 	if err != nil {
-		return fmt.Errorf("decryptMessage: %w", err)
+		return nil, fmt.Errorf("decryptMessage: %w", err)
 	}
 	decryptedMsg.ConversationID = conv.dbConv.ID
 
 	// Insert message in database
 	dbMessage, err := queries.InsertMessage(ctx, *decryptedMsg)
 	if err != nil {
-		return fmt.Errorf("queries.InsertMessage: %w", err)
+		return nil, fmt.Errorf("queries.InsertMessage: %w", err)
 	}
 	conv.messages = append(conv.messages, dbMessage)
-	return nil
+	return dbMessage, nil
 }
 
 func (u *User) decryptMessage(message openapi.Message) (*sqlcgen.InsertMessageParams, error) {

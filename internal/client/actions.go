@@ -75,7 +75,7 @@ func (a *ActionListUsers) Do(ctx context.Context, u *UI) error {
 	users := make([]*User, 0, len(localUsers))
 	for _, localUser := range localUsers {
 		localUser := localUser
-		user, err := NewUser(localUser)
+		user, err := NewUser(localUser, UISingleton.openapiClient, UISingleton.db)
 		if err != nil {
 			return fmt.Errorf("NewUser: %w", err)
 		}
@@ -133,7 +133,7 @@ func (a *ActionCreateUser) Do(ctx context.Context, u *UI) error {
 		return fmt.Errorf("queries.InsertLocalUser: %w", err)
 	}
 
-	user, err := NewUser(localUser)
+	user, err := NewUser(localUser, UISingleton.openapiClient, UISingleton.db)
 	if err != nil {
 		return fmt.Errorf("NewUser: %w", err)
 	}
@@ -168,7 +168,7 @@ type ActionFetchMessages struct {
 }
 
 func (a *ActionFetchMessages) Do(ctx context.Context, u *UI) error {
-	err := a.user.FetchMessages(ctx)
+	_, err := a.user.FetchMessages(ctx)
 	if err != nil {
 		return fmt.Errorf("user.FetchMessages: %w", err)
 	}
