@@ -23,8 +23,8 @@ NC=\033[0m # No Color
 .PHONY: build-server
 build-server: build-react
 	@printf "${BLUE}🏗️ Building server...${NC}\n"
-	earthly +build
-	earthly +run
+	earthly --platform=linux/amd64 +build 
+	earthly --platform=linux/amd64 +run
 	@docker login -u ${DOCKER_USER} --password-stdin <<< ${DOCKER_PASSWORD}
 	docker push ${DOCKER_USER}/talk_server:latest
 	@printf "${GREEN}✅ Server built successfully${NC}\n"
@@ -42,6 +42,7 @@ restart-server:
 			-e AUTH_TOKEN_SECRET_KEY=${AUTH_TOKEN_SECRET_KEY} \
 			-e DATABASE_URL=${SERVER_DATABASE_URL} \
 			--network host \
+			--platform=linux/amd64 \
 			--name talk_server \
 			--volume ~/public/:/bin/public/ \
 			--volume ~/talk_tls_cache:/var/www/.cache \
@@ -115,6 +116,7 @@ server-db-create:
 	ssh $(REMOTE_HOST) ' \
 		docker run \
 			--name postgres \
+			--platform=linux/amd64 \
 			-e POSTGRES_PASSWORD=mypassword \
 			-e POSTGRES_USER=myuser \
 			-e POSTGRES_DB=mydb \
